@@ -6,13 +6,13 @@ The repository containing all work concerning data retrieval and annotation for 
 
 ### Goal : provide a tool for efficient annotation of chiasmi
 
-#### First step : candidate selection
+#### First step : candidate extraction
 __Input__ : Text containing chiasmi candidates \
 __Input format__ : plain text in a .txt file \
 __Output__ : The extracted chiasmi candidates \
 __Output format__ : blocks of 30 words containing each an emphasized chiasmi candidate or a .txt file with a list of said blocks, one per line
 
-#### Second step : processing
+#### Second step : candidate selection
 __Input__ : chiasmi candidates \
 __Input format__ : blocks of 30 words containing an emphasized chiasmi candidate or a .txt file with a list of said blocks, one per line \
 __Output__ : none if the candidate is rejected, the chiasmi and its context if it is accepted \

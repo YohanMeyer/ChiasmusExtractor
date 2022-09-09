@@ -4,7 +4,7 @@ import itertools
 import string
 import copy
 # doc for stanza : https://stanfordnlp.github.io/stanza/data_objects#document
-
+# Stopwords downloaded on https://www.ranks.nl/stopwords and manually modified
 
 # -- Utility functions --
 def first_word_from(text, word_begin):

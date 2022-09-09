@@ -1,7 +1,6 @@
 import stanza
 from stanza.pipeline.core import DownloadMethod
 import itertools
-import string
 import copy
 # doc for stanza : https://stanfordnlp.github.io/stanza/data_objects#document
 # Stopwords downloaded on https://www.ranks.nl/stopwords and manually modified
@@ -10,19 +9,27 @@ import copy
 def first_word_from(text, word_begin):
     return text[word_begin:].split(maxsplit=1)[0].lower()
 
+def ignore_punctuation(wordIterator, nextWord):
+    while(nextWord.upos == 'PUNCT' or nextWord.upos == 'SYM' or nextWord.upos == 'X'):
+        try:
+            nextWord = next(wordIterator)
+        except StopIteration:
+            return -1
 
+    return nextWord
+    
 # -- Initializing the project --
 
 # fileName = input('Enter the name of the file to process : ')
-fileName = 'small-chiasmi.txt'
-# fileName = 'test.txt'
+# fileName = 'small-chiasmi.txt'
+fileName = 'test.txt'
 
 with open(fileName) as file:
     content = file.read()
     file.close()
 
 stanza.download('en', processors='tokenize, lemma, pos')
-processingPipeline = stanza.Pipeline('en', processors='tokenize, lemma', download_method=DownloadMethod.REUSE_RESOURCES)
+processingPipeline = stanza.Pipeline('en', processors='tokenize, lemma, pos', download_method=DownloadMethod.REUSE_RESOURCES)
 
 doc = processingPipeline(content)
 wordsFront = doc.iter_words()
@@ -41,11 +48,6 @@ wordsBack = doc.iter_words()
 # -- Processing function for each next word --
 
 def process_next_word(currentTerm, currentId, saveTable, matchTable):
-
-    # If we are currently processing a "punctuation word", then we ignore it
-    # [TBD] : ignore rather than skip (currently, it messes with the window initialization, not going up to 30 words)
-    if currentTerm in string.punctuation:
-        return
 
     # print('current id : ', [currentId], 'current term : ', currentTerm)
     if currentTerm in saveTable:
@@ -86,7 +88,14 @@ matchTable = {}
 # -- Initializing the sliding window over the first 30 characters --
 
 for _ in range(30):
+    # If we are currently processing a "punctuation word", then we ignore it
     nextWord = next(wordsFront)
+    nextWord = ignore_punctuation(wordsFront, nextWord)
+    
+    # if we reached the end of the file
+    if(nextWord == -1):
+        break
+        
     process_next_word(nextWord.lemma, nextWord.parent.start_char, lemmaTable, matchTable)
 
 # -- Main part : make the window slide using wordsFront and wordsBack --
@@ -94,30 +103,33 @@ for _ in range(30):
 
 # loop stops when wordsFront ends
 for nextWord, oldWord in zip(wordsFront, wordsBack):
+    # If we are currently processing a "punctuation word", then we ignore it
+    nextWord = ignore_punctuation(wordsFront, nextWord)
+    oldWord = ignore_punctuation(wordsBack, oldWord)
     oldLemma = oldWord.lemma
-    # print(lemmaTable)
-    # print('--------')
 
-    # Delete the word exiting the sliding window from lemmaTable (only non-punctuation words)
-    if oldLemma not in string.punctuation:
-        # not leaving an empty entry in the table
-        if(len(lemmaTable[oldLemma]) <= 1):
-            del lemmaTable[oldLemma]
-        else:
-            del lemmaTable[oldLemma][0]
-        # Updating matchTable if necessary after this deletion
-        if oldLemma in matchTable:
-            # delete when only one occurrence is left - not a match anymore
-            if(len(matchTable[oldLemma]) <= 2):
-                del matchTable[oldLemma]
-            else:
-                del matchTable[oldLemma][0]
-
+    # if we reached the end of the file
+    if(nextWord == -1):
+        break
+        
     # Processing the new word
     process_next_word(nextWord.lemma, nextWord.parent.start_char, lemmaTable, matchTable)
 
+    # Delete the word exiting the sliding window from lemmaTable
+    # not leaving an empty entry in the table
+    if(len(lemmaTable[oldLemma]) <= 1):
+        del lemmaTable[oldLemma]
+    else:
+        del lemmaTable[oldLemma][0]
+    # Updating matchTable if necessary after this deletion
+    if oldLemma in matchTable:
+        # delete when only one occurrence is left - not a match anymore
+        if(len(matchTable[oldLemma]) <= 2):
+            del matchTable[oldLemma]
+        else:
+            del matchTable[oldLemma][0]
+    
 # -- Printing the result (simple printing, some error when extracting the word, unoptimized) --
-
 candidateWordList = [
     [(candidate_begin, first_word_from(content, candidate_begin)) for candidate_begin in candidate]
     for candidate

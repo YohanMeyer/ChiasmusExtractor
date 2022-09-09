@@ -15,6 +15,7 @@ def first_word_from(text, word_begin):
 
 # fileName = input('Enter the name of the file to process : ')
 fileName = 'small-chiasmi.txt'
+# fileName = 'test.txt'
 
 with open(fileName) as file:
     content = file.read()
@@ -37,32 +38,23 @@ wordsBack = doc.iter_words()
 # table. Every time we have a match -> verify if we have a match inside
 
 
-# -- Creating the general variables --
-
-candidateList = []
-lemmaTable = {}
-matchTable = {}
-
-
 # -- Processing function for each next word --
 
-def process_next_word(nextWord):
-    currentLemma = nextWord.lemma
+def process_next_word(currentTerm, currentId, saveTable, matchTable):
 
     # If we are currently processing a "punctuation word", then we ignore it
     # [TBD] : ignore rather than skip (currently, it messes with the window initialization, not going up to 30 words)
-    if currentLemma in string.punctuation:
+    if currentTerm in string.punctuation:
         return
 
-    currentId = nextWord.parent.start_char
-    # print('current id : ', [currentId], 'current lemma : ', currentLemma)
-    if currentLemma in lemmaTable:
+    # print('current id : ', [currentId], 'current term : ', currentTerm)
+    if currentTerm in saveTable:
         # we have a match !
         # update lemma table
-        lemmaTable[currentLemma].append(currentId)
+        saveTable[currentTerm].append(currentId)
 
         # compute all possible pairs for the new match
-        newMatches = list(itertools.combinations(lemmaTable[currentLemma], 2))
+        newMatches = list(itertools.combinations(saveTable[currentTerm], 2))
 
         # compute all possible pairs of old matches
         oldMatches = [(oldMatch, list(itertools.combinations(matchTable[oldMatch], 2))) for oldMatch in matchTable]
@@ -80,17 +72,22 @@ def process_next_word(nextWord):
         # print('----')
 
         # update match table
-        matchTable[currentLemma] = copy.deepcopy(lemmaTable[currentLemma])
+        matchTable[currentTerm] = copy.deepcopy(saveTable[currentTerm])
     else:
         # update lemma table
-        lemmaTable[currentLemma] = [currentId]
+        saveTable[currentTerm] = [currentId]
 
+# -- Creating the general variables --
+
+candidateList = []
+lemmaTable = {}
+matchTable = {}
 
 # -- Initializing the sliding window over the first 30 characters --
 
 for _ in range(30):
     nextWord = next(wordsFront)
-    process_next_word(nextWord)
+    process_next_word(nextWord.lemma, nextWord.parent.start_char, lemmaTable, matchTable)
 
 # -- Main part : make the window slide using wordsFront and wordsBack --
 #    (Same algorithm but delete info relevant to wordsBack when moving forward)
@@ -108,7 +105,6 @@ for nextWord, oldWord in zip(wordsFront, wordsBack):
             del lemmaTable[oldLemma]
         else:
             del lemmaTable[oldLemma][0]
-            
         # Updating matchTable if necessary after this deletion
         if oldLemma in matchTable:
             # delete when only one occurrence is left - not a match anymore
@@ -118,8 +114,7 @@ for nextWord, oldWord in zip(wordsFront, wordsBack):
                 del matchTable[oldLemma][0]
 
     # Processing the new word
-    process_next_word(nextWord)
-
+    process_next_word(nextWord.lemma, nextWord.parent.start_char, lemmaTable, matchTable)
 
 # -- Printing the result (simple printing, some error when extracting the word, unoptimized) --
 
@@ -128,7 +123,7 @@ candidateWordList = [
     for candidate
     in candidateList
 ]
-print('-------\ncandidate list :')
+print('-------\ncandidate list (', len(candidateWordList), ' candidates):')
 for candidate in candidateWordList:
     print(candidate)
 

@@ -2,6 +2,7 @@ import stanza
 from stanza.pipeline.core import DownloadMethod
 import itertools
 import copy
+from nltk.tokenize import wordpunct_tokenize
 # doc for stanza : https://stanfordnlp.github.io/stanza/data_objects#document
 # Stopwords downloaded on https://www.ranks.nl/stopwords and manually modified
 
@@ -9,25 +10,29 @@ import copy
 def first_word_from(text, word_begin):
     return text[word_begin:].split(maxsplit=1)[0].lower()
 
-def ignore_punctuation(wordIterator, nextWord):
-    while(nextWord.upos == 'PUNCT' or nextWord.upos == 'SYM' or nextWord.upos == 'X'):
+def ignore_punctuation_and_stopwords(wordIterator, nextWord, stopwords):
+    while(nextWord.upos == 'PUNCT' or nextWord.upos == 'SYM' or nextWord.upos == 'X' 
+            or nextWord.text.lower() in stopwords):
         try:
             nextWord = next(wordIterator)
         except StopIteration:
             return -1
-
+    
     return nextWord
     
 # -- Initializing the project --
 
 # fileName = input('Enter the name of the file to process : ')
-# fileName = 'small-chiasmi.txt'
-fileName = 'test.txt'
+fileName = 'small-chiasmi.txt'
+# fileName = 'chiasmi.txt'
+# fileName = 'test.txt'
 
 with open(fileName) as file:
     content = file.read()
     file.close()
 
+
+# -- Initializing the Stanza pipeline for further processing --
 stanza.download('en', processors='tokenize, lemma, pos')
 processingPipeline = stanza.Pipeline('en', processors='tokenize, lemma, pos', download_method=DownloadMethod.REUSE_RESOURCES)
 
@@ -35,49 +40,37 @@ doc = processingPipeline(content)
 wordsFront = doc.iter_words()
 wordsBack = doc.iter_words()
 
-# sentence = doc.sentences[0]
-# for word in sentence.words:
-#     print(word.lemma)
-
-# [TBD] : stopword and punctuation : either delete them with pre-processing or properly ignore them in the processing function
+stopwords = set(line.strip() for line in open('stopwords.txt'))
 
 # we have corresponding lemmas for each word. We need to initialize a window of 30 lemmas and put them in a hash
 # table. Every time we have a match -> verify if we have a match inside
 
-
 # -- Processing function for each next word --
 
-def process_next_word(currentTerm, currentId, saveTable, matchTable):
-
-    # print('current id : ', [currentId], 'current term : ', currentTerm)
-    if currentTerm in saveTable:
-        # we have a match !
-        # update lemma table
-        saveTable[currentTerm].append(currentId)
+def process_next_word(currentTerm, currentId, storageTable, matchTable):
+    if currentTerm in storageTable:
+        # we have a match ! Let's update the storage table
+        storageTable[currentTerm].append(currentId)
 
         # compute all possible pairs for the new match
-        newMatches = list(itertools.combinations(saveTable[currentTerm], 2))
+        newMatches = list(itertools.combinations(storageTable[currentTerm], 2))
 
         # compute all possible pairs of old matches
         oldMatches = [(oldMatch, list(itertools.combinations(matchTable[oldMatch], 2))) for oldMatch in matchTable]
 
         for newMatch in newMatches:
-            # print('newMatch ! ; ids :', newMatch)
             for oldMatch in oldMatches:
-                # print('oldMatch ! lemma : ', oldMatch[0], ' ; ids : ', oldMatch[1])
                 # iterate over all pairs from the old match to check if it is inside the new match
                 for oldPair in oldMatch[1]:
                     if (oldPair[0] > newMatch[0] and oldPair[1] < newMatch[1]):
                         # found a chiasmus candidate
                         candidateList.append([newMatch[0], oldPair[0], oldPair[1], newMatch[1]])
-        #                 print("new candidate")
-        # print('----')
 
-        # update match table
-        matchTable[currentTerm] = copy.deepcopy(saveTable[currentTerm])
+        # update the match table
+        matchTable[currentTerm] = copy.deepcopy(storageTable[currentTerm])
     else:
-        # update lemma table
-        saveTable[currentTerm] = [currentId]
+        # no match, let's update the storage table
+        storageTable[currentTerm] = [currentId]
 
 # -- Creating the general variables --
 
@@ -88,9 +81,8 @@ matchTable = {}
 # -- Initializing the sliding window over the first 30 characters --
 
 for _ in range(30):
-    # If we are currently processing a "punctuation word", then we ignore it
     nextWord = next(wordsFront)
-    nextWord = ignore_punctuation(wordsFront, nextWord)
+    nextWord = ignore_punctuation_and_stopwords(wordsFront, nextWord, stopwords)
     
     # if we reached the end of the file
     if(nextWord == -1):
@@ -104,8 +96,8 @@ for _ in range(30):
 # loop stops when wordsFront ends
 for nextWord, oldWord in zip(wordsFront, wordsBack):
     # If we are currently processing a "punctuation word", then we ignore it
-    nextWord = ignore_punctuation(wordsFront, nextWord)
-    oldWord = ignore_punctuation(wordsBack, oldWord)
+    nextWord = ignore_punctuation_and_stopwords(wordsFront, nextWord, stopwords)
+    oldWord = ignore_punctuation_and_stopwords(wordsBack, oldWord, stopwords)
     oldLemma = oldWord.lemma
 
     # if we reached the end of the file

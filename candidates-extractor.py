@@ -2,6 +2,7 @@ import stanza
 from stanza.pipeline.core import DownloadMethod
 import itertools
 import string
+import copy
 # doc for stanza : https://stanfordnlp.github.io/stanza/data_objects#document
 
 
@@ -30,7 +31,7 @@ wordsBack = doc.iter_words()
 # for word in sentence.words:
 #     print(word.lemma)
 
-# [TBD] : remove lemmas whose words are in the stopword list ?
+# [TBD] : stopword and punctuation : either delete them with pre-processing or properly ignore them in the processing function
 
 # we have corresponding lemmas for each word. We need to initialize a window of 30 lemmas and put them in a hash
 # table. Every time we have a match -> verify if we have a match inside
@@ -43,12 +44,13 @@ lemmaTable = {}
 matchTable = {}
 
 
-# -- Processing function for each next word (extracted as a function because used in two different places) --
+# -- Processing function for each next word --
 
 def process_next_word(nextWord):
     currentLemma = nextWord.lemma
 
-    # If we are currently processing a "punctuation word", then we skip it
+    # If we are currently processing a "punctuation word", then we ignore it
+    # [TBD] : ignore rather than skip (currently, it messes with the window initialization, not going up to 30 words)
     if currentLemma in string.punctuation:
         return
 
@@ -78,7 +80,7 @@ def process_next_word(nextWord):
         # print('----')
 
         # update match table
-        matchTable[currentLemma] = lemmaTable[currentLemma]
+        matchTable[currentLemma] = copy.deepcopy(lemmaTable[currentLemma])
     else:
         # update lemma table
         lemmaTable[currentLemma] = [currentId]
@@ -90,21 +92,30 @@ for _ in range(30):
     nextWord = next(wordsFront)
     process_next_word(nextWord)
 
-
-# -- Initializing done, now for the "real work" : make the window slide using wordsFront and wordsBack --
+# -- Main part : make the window slide using wordsFront and wordsBack --
 #    (Same algorithm but delete info relevant to wordsBack when moving forward)
 
-for nextWord in wordsFront:
-    # Deleting the word the just exited the sliding window from lemmaTable
-    oldWord = next(wordsBack)
+# loop stops when wordsFront ends
+for nextWord, oldWord in zip(wordsFront, wordsBack):
     oldLemma = oldWord.lemma
-    # We only process non-punctuation words
+    # print(lemmaTable)
+    # print('--------')
+
+    # Delete the word exiting the sliding window from lemmaTable (only non-punctuation words)
     if oldLemma not in string.punctuation:
-        del lemmaTable[oldLemma][0]
+        # not leaving an empty entry in the table
+        if(len(lemmaTable[oldLemma]) <= 1):
+            del lemmaTable[oldLemma]
+        else:
+            del lemmaTable[oldLemma][0]
+            
         # Updating matchTable if necessary after this deletion
         if oldLemma in matchTable:
-            if len(matchTable[oldLemma]) <= 1:
+            # delete when only one occurrence is left - not a match anymore
+            if(len(matchTable[oldLemma]) <= 2):
                 del matchTable[oldLemma]
+            else:
+                del matchTable[oldLemma][0]
 
     # Processing the new word
     process_next_word(nextWord)

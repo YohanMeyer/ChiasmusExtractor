@@ -10,17 +10,17 @@ The repository containing all work concerning data retrieval and annotation for 
 __Input__ : Text containing chiasmi candidates \
 __Input format__ : plain text in a .txt file \
 __Output__ : The extracted chiasmi candidates \
-__Output format__ : A .txt file with a list of blocks of 35 (30 used for extraction + 5 subsequent) words, each containing an emphasized chiasmi candidate and its position in the original file, one block per line
+__Output format__ : A .txt file with a list of blocks of 30 words (and adding 25 subsequent characters for context) on a line, and the position of a chiasmi candidate in the original file on the next line
 
 #### Second step : candidate selection
 __Input__ : chiasmi candidates \
-__Input format__ : A .txt file with a list of blocks of 35 words, each containing an emphasized chiasmi candidate and its position in the original file, one block per line \
+__Input format__ : A .txt file with a list of blocks of 30 words (and adding 25 subsequent characters for context) on a line, and the position of a chiasmi candidate in the original file on the next line \
 __Output__ : none if the candidate is rejected, the chiasmi and its context if it is accepted \
 __Output format__ : same as the input
 
 #### Third step : formatting
 __Input__ : The original text and a list of chiasmi with their position in the text
-__Input format__ : Two separate .txt files (one with the original raw text and one with the list of blocks of 35 words with specified chiasmi) \
+__Input format__ : Two separate .txt files (one with the original raw text and one with the list of blocks of 30 words with specified chiasmi) \
 __Output__ : A .xml file containing the annotated text \
 __Output format__ : specified by Harris et al. (2018)
 

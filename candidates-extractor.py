@@ -85,6 +85,25 @@ def process_next_word(currentTerm, currentId, storageTable, matchTable, startBlo
 
 # -- Creating the general variables --
 
+candidateList = []
+lemmaTable = {}
+matchTable = {}
+
+# -- Initializing the sliding window over the first 30 characters --
+
+for _ in range(30):
+    nextWord = next(wordsFront)
+    nextWord = ignore_punctuation_and_stopwords(wordsFront, nextWord, stopwords)
+    
+    # if we reached the end of the file
+    if(nextWord == -1):
+        break
+        
+    process_next_word(nextWord.lemma, nextWord.parent.start_char, lemmaTable, matchTable, 0, nextWord.parent.end_char)
+
+# -- Main part : make the window slide using wordsFront and wordsBack --
+#    (Same algorithm but delete info relevant to wordsBack when moving forward)
+
 # candidateList is a list containing lists of the form
 #   [[info regarding the block], [info regarding the chiasm in itself]]
 # where the first list contains :
@@ -93,54 +112,57 @@ def process_next_word(currentTerm, currentId, storageTable, matchTable, startBlo
 #   [[startFirstTerm, endFirstTerm], [startSecondTerm, endSecondTerm], ...]
 #   each "Term" being a word that is part of the chiasmus candidate
 
-candidateList = []
-lemmaTable = {}
-matchTable = {}
-
 # -- Main part : make the window slide using wordsFront and wordsBack --
 
-loop = 0
 # foreach stops when wordsFront ends
-for nextWord, oldWord in zip(wordsFront, wordsBack):    
-    # handle the rear of the window
-    if loop < 30:
-        # initializing the window to have 30 words
-        oldLemma = ''
-        startBlock = 0
-    else:
-        # If we are currently processing a "punctuation or stop word", then we ignore it
-        oldWord = ignore_punctuation_and_stopwords(wordsBack, oldWord, stopwords)
-        oldLemma = oldWord.lemma
-        startBlock = oldWord.parent.start_char
-        
-        # Delete the word exiting the sliding window from lemmaTable
-        # not leaving an empty entry in the table
-        if(len(lemmaTable[oldLemma]) <= 1):
-            del lemmaTable[oldLemma]
-        else:
-            del lemmaTable[oldLemma][0]
-        # Updating matchTable if necessary after this deletion
-        if oldLemma in matchTable:
-            # delete when only one occurrence is left - not a match anymore
-            if(len(matchTable[oldLemma]) <= 2):
-                del matchTable[oldLemma]
-            else:
-                del matchTable[oldLemma][0]
-    loop += 1
-    
-    # handle the front of the window
+for nextWord, oldWord in zip(wordsFront, wordsBack):
     # If we are currently processing a "punctuation or stop word", then we ignore it
     nextWord = ignore_punctuation_and_stopwords(wordsFront, nextWord, stopwords)
     # if we reached the end of the file
     if(nextWord == -1):
         break
 
-    # Processing the new word
+    oldWord = ignore_punctuation_and_stopwords(wordsBack, oldWord, stopwords)
+    oldLemma = oldWord.lemma
+    startBlock = oldWord.parent.start_char
+
+    # Processing the front of the window
     process_next_word(nextWord.lemma, nextWord.parent.start_char, lemmaTable, matchTable, startBlock, nextWord.parent.end_char)
+    
+    # handle the rear of the window
+    # Delete the word exiting the sliding window from lemmaTable
+    if(len(lemmaTable[oldLemma]) <= 1):
+        del lemmaTable[oldLemma]
+    else:
+        del lemmaTable[oldLemma][0]
+    # Updating matchTable if necessary after this deletion
+    if oldLemma in matchTable:
+        # delete when only one occurrence is left - not a match anymore
+        if(len(matchTable[oldLemma]) <= 2):
+            del matchTable[oldLemma]
+        else:
+            del matchTable[oldLemma][0]
+
+# [TBD] : process the last 30 words of the file !
+
 
 print('-------\ncandidate list (', len(candidateList), ' candidates):')
 for candidateBlock, candidateTerms in candidateList:
     print(word_from_positions(candidateBlock, content))
-    print(word_from_positions(candidateTerms[0], content), word_from_positions(candidateTerms[1], content), word_from_positions(candidateTerms[2], content), word_from_positions(candidateTerms[3], content))
-    print('-----')
+    for term in candidateTerms:
+        print(word_from_positions(term, content), end = " ")
+    print('\n-----')
 
+fileNameCandidates = fileName[:-4] + "-candidates.txt"
+with open(fileNameCandidates, 'w') as fileOut:
+    for candidateBlock, candidateTerms in candidateList:
+        # the newline character separates candidates
+        fileOut.write(word_from_positions(candidateBlock, content).replace("\n", ""))
+        fileOut.write('\n')
+        fileOut.write(str(candidateBlock[0]) + ' ' + str(candidateBlock[1]))
+        for termPair in candidateTerms:
+            for term in termPair:
+                term = term - candidateBlock[0]
+                fileOut.write(' ' + str(term))
+        fileOut.write('\n')
+    fileOut.close()

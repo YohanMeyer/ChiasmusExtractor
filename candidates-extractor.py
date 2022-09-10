@@ -19,13 +19,16 @@ def ignore_punctuation_and_stopwords(wordIterator, nextWord, stopwords):
             return -1
     
     return nextWord
-    
+
+def word_from_positions(positions, fileContent):
+    return fileContent[positions[0]:positions[1]]
+
 # -- Initializing the project --
 
 # fileName = input('Enter the name of the file to process : ')
-fileName = 'small-chiasmi.txt'
-# fileName = 'chiasmi.txt'
-# fileName = 'test.txt'
+# fileName = 'small-chiasmi.txt'
+fileName = 'chiasmi.txt'
+# fileName = 'test2.txt'
 
 with open(fileName) as file:
     content = file.read()
@@ -47,24 +50,32 @@ stopwords = set(line.strip() for line in open('stopwords.txt'))
 
 # -- Processing function for each next word --
 
-def process_next_word(currentTerm, currentId, storageTable, matchTable):
+def process_next_word(currentTerm, currentId, storageTable, matchTable, startBlock, endBlock):
     if currentTerm in storageTable:
         # we have a match ! Let's update the storage table
         storageTable[currentTerm].append(currentId)
 
-        # compute all possible pairs for the new match
-        newMatches = list(itertools.combinations(storageTable[currentTerm], 2))
+        # compute all possible pairs for the new match (A in A B B A)
+        newPairs = [currentTerm, list(itertools.combinations(storageTable[currentTerm], 2))]
 
-        # compute all possible pairs of old matches
-        oldMatches = [(oldMatch, list(itertools.combinations(matchTable[oldMatch], 2))) for oldMatch in matchTable]
-
-        for newMatch in newMatches:
-            for oldMatch in oldMatches:
-                # iterate over all pairs from the old match to check if it is inside the new match
-                for oldPair in oldMatch[1]:
-                    if (oldPair[0] > newMatch[0] and oldPair[1] < newMatch[1]):
-                        # found a chiasmus candidate
-                        candidateList.append([newMatch[0], oldPair[0], oldPair[1], newMatch[1]])
+        # compute all possible pairs of old matches (B in A B B A)
+        oldMatches = [(oldTerm, list(itertools.combinations(matchTable[oldTerm], 2))) for oldTerm in matchTable]
+        
+        # iterate over all pairs for the new match
+        for newPair in newPairs[1]:
+          # iterate over all old matches
+          for oldMatch in oldMatches:
+            oldTerm = oldMatch[0]
+            # iterate over all pairs from the old match to check if it is inside the new match
+            for oldPair in oldMatch[1]:
+                if (oldPair[0] > newPair[0] and oldPair[1] < newPair[1]):
+                    # found a chiasmus candidate                
+                    # we need, for each candidate : 
+                    #   - the position in the raw text of the first character of the first word of the block
+                    #   - the position in the raw text of the last character of the 5th word coming after the block
+                    #       -> currently, we take the subsequent 25 characters
+                    #   - the position in the block of the words forming the candidate
+                    candidateList.append([[startBlock, endBlock + 25], [[newPair[0], newPair[0] + len(currentTerm)], [oldPair[0], oldPair[0] + len(oldTerm)], [oldPair[1], oldPair[1] + len(oldTerm)], [newPair[1], newPair[1] + len(currentTerm)]]])
 
         # update the match table
         matchTable[currentTerm] = copy.deepcopy(storageTable[currentTerm])
@@ -74,60 +85,62 @@ def process_next_word(currentTerm, currentId, storageTable, matchTable):
 
 # -- Creating the general variables --
 
+# candidateList is a list containing lists of the form
+#   [[info regarding the block], [info regarding the chiasm in itself]]
+# where the first list contains :
+#   [the position of the first, the position of the last character of the block]
+# and the second list contains :
+#   [[startFirstTerm, endFirstTerm], [startSecondTerm, endSecondTerm], ...]
+#   each "Term" being a word that is part of the chiasmus candidate
+
 candidateList = []
 lemmaTable = {}
 matchTable = {}
 
-# -- Initializing the sliding window over the first 30 characters --
-
-for _ in range(30):
-    nextWord = next(wordsFront)
-    nextWord = ignore_punctuation_and_stopwords(wordsFront, nextWord, stopwords)
-    
-    # if we reached the end of the file
-    if(nextWord == -1):
-        break
-        
-    process_next_word(nextWord.lemma, nextWord.parent.start_char, lemmaTable, matchTable)
-
 # -- Main part : make the window slide using wordsFront and wordsBack --
-#    (Same algorithm but delete info relevant to wordsBack when moving forward)
 
-# loop stops when wordsFront ends
-for nextWord, oldWord in zip(wordsFront, wordsBack):
-    # If we are currently processing a "punctuation word", then we ignore it
+loop = 0
+# foreach stops when wordsFront ends
+for nextWord, oldWord in zip(wordsFront, wordsBack):    
+    # handle the rear of the window
+    if loop < 30:
+        # initializing the window to have 30 words
+        oldLemma = ''
+        startBlock = 0
+    else:
+        # If we are currently processing a "punctuation or stop word", then we ignore it
+        oldWord = ignore_punctuation_and_stopwords(wordsBack, oldWord, stopwords)
+        oldLemma = oldWord.lemma
+        startBlock = oldWord.parent.start_char
+        
+        # Delete the word exiting the sliding window from lemmaTable
+        # not leaving an empty entry in the table
+        if(len(lemmaTable[oldLemma]) <= 1):
+            del lemmaTable[oldLemma]
+        else:
+            del lemmaTable[oldLemma][0]
+        # Updating matchTable if necessary after this deletion
+        if oldLemma in matchTable:
+            # delete when only one occurrence is left - not a match anymore
+            if(len(matchTable[oldLemma]) <= 2):
+                del matchTable[oldLemma]
+            else:
+                del matchTable[oldLemma][0]
+    loop += 1
+    
+    # handle the front of the window
+    # If we are currently processing a "punctuation or stop word", then we ignore it
     nextWord = ignore_punctuation_and_stopwords(wordsFront, nextWord, stopwords)
-    oldWord = ignore_punctuation_and_stopwords(wordsBack, oldWord, stopwords)
-    oldLemma = oldWord.lemma
-
     # if we reached the end of the file
     if(nextWord == -1):
         break
-        
-    # Processing the new word
-    process_next_word(nextWord.lemma, nextWord.parent.start_char, lemmaTable, matchTable)
 
-    # Delete the word exiting the sliding window from lemmaTable
-    # not leaving an empty entry in the table
-    if(len(lemmaTable[oldLemma]) <= 1):
-        del lemmaTable[oldLemma]
-    else:
-        del lemmaTable[oldLemma][0]
-    # Updating matchTable if necessary after this deletion
-    if oldLemma in matchTable:
-        # delete when only one occurrence is left - not a match anymore
-        if(len(matchTable[oldLemma]) <= 2):
-            del matchTable[oldLemma]
-        else:
-            del matchTable[oldLemma][0]
-    
-# -- Printing the result (simple printing, some error when extracting the word, unoptimized) --
-candidateWordList = [
-    [(candidate_begin, first_word_from(content, candidate_begin)) for candidate_begin in candidate]
-    for candidate
-    in candidateList
-]
-print('-------\ncandidate list (', len(candidateWordList), ' candidates):')
-for candidate in candidateWordList:
-    print(candidate)
+    # Processing the new word
+    process_next_word(nextWord.lemma, nextWord.parent.start_char, lemmaTable, matchTable, startBlock, nextWord.parent.end_char)
+
+print('-------\ncandidate list (', len(candidateList), ' candidates):')
+for candidateBlock, candidateTerms in candidateList:
+    print(word_from_positions(candidateBlock, content))
+    print(word_from_positions(candidateTerms[0], content), word_from_positions(candidateTerms[1], content), word_from_positions(candidateTerms[2], content), word_from_positions(candidateTerms[3], content))
+    print('-----')
 

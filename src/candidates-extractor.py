@@ -1,41 +1,36 @@
-import stanza
-from stanza.pipeline.core import DownloadMethod
 import itertools
 import copy
+import os.path
+import sys
+
+import stanza
+from stanza.pipeline.core import DownloadMethod
 from nltk.tokenize import wordpunct_tokenize
+from embeddings import GloveEmbedding
+
+from utility import *
+
 # doc for stanza : https://stanfordnlp.github.io/stanza/data_objects#document
 # Stopwords downloaded on https://www.ranks.nl/stopwords and manually modified
 
-# -- Utility functions --
-def first_word_from(text, word_begin):
-    return text[word_begin:].split(maxsplit=1)[0].lower()
-
-def ignore_punctuation_and_stopwords(wordIterator, nextWord, stopwords):
-    while(nextWord.upos == 'PUNCT' or nextWord.upos == 'SYM' or nextWord.upos == 'X' 
-            or nextWord.text.lower() in stopwords):
-        try:
-            nextWord = next(wordIterator)
-        except StopIteration:
-            return -1
-    
-    return nextWord
-
-def word_from_positions(positions, fileContent):
-    return fileContent[positions[0]:positions[1]]
 
 # -- Initializing the project --
 
 # fileName = input('Enter the name of the file to process : ')
-# fileName = 'small-chiasmi.txt'
-fileName = 'chiasmi.txt'
-# fileName = 'test2.txt'
+fileName = '../inputs/small-chiasmi.txt'
+# fileName = '../inputs/chiasmi.txt'
+# fileName = '../test2.txt'
+
+if __name__ == '__main__' and len(sys.argv) >= 2:
+    fileName = sys.argv[1]
 
 with open(fileName) as file:
     content = file.read()
     file.close()
 
 
-# -- Initializing the Stanza pipeline for further processing --
+# -- Initializing the Stanza pipeline and GloVe embedding for further processing --
+
 stanza.download('en', processors='tokenize, lemma, pos')
 processingPipeline = stanza.Pipeline('en', processors='tokenize, lemma, pos', download_method=DownloadMethod.REUSE_RESOURCES)
 
@@ -45,7 +40,10 @@ wordsBack = doc.iter_words()
 
 stopwords = set(line.strip() for line in open('stopwords.txt'))
 
-# we have corresponding lemmas for each word. We need to initialize a window of 30 lemmas and put them in a hash
+os.environ['HOME'] = os.path.join('..', 'GloVe')
+g = GloveEmbedding('common_crawl_48', d_emb=300, show_progress=True)
+
+# We have corresponding lemmas for each word. We need to initialize a window of 30 lemmas and put them in a hash
 # table. Every time we have a match -> verify if we have a match inside
 
 # -- Processing function for each next word --
@@ -153,7 +151,7 @@ for candidateBlock, candidateTerms in candidateList:
         print(word_from_positions(term, content), end = " ")
     print('\n-----')
 
-fileNameCandidates = fileName[:-4] + "-candidates.txt"
+fileNameCandidates = os.path.join("..", "outputs", os.path.splitext(os.path.basename(fileName))[0] + "-candidates.txt")
 with open(fileNameCandidates, 'w') as fileOut:
     for candidateBlock, candidateTerms in candidateList:
         # the newline character separates candidates

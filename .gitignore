@@ -1,6 +1,9 @@
 # Generated files
 *-candidates.txt
 
+# Embedding database
+GloVe/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

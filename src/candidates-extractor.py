@@ -2,6 +2,7 @@ import itertools
 import copy
 import os.path
 import sys
+import json
 
 import stanza
 from stanza.pipeline.core import DownloadMethod
@@ -16,17 +17,18 @@ from utility import *
 
 # -- Initializing the project --
 
-# fileName = input('Enter the name of the file to process : ')
-fileName = '../inputs/small-chiasmi.txt'
-# fileName = '../inputs/chiasmi.txt'
-# fileName = '../test2.txt'
-
 if __name__ == '__main__' and len(sys.argv) >= 2:
-    fileName = sys.argv[1]
+    fileName = '../inputs/' + sys.argv[1]
+else:
+    fileName = input('Enter the name of the file to process : ')
 
 with open(fileName) as file:
+    print("Loading content of ", fileName, '...')
     content = file.read()
     file.close()
+    print("File loaded !")
+    print("-------------")
+    print()
 
 
 # -- Initializing the Stanza pipeline and GloVe embedding for further processing --
@@ -151,16 +153,36 @@ for candidateBlock, candidateTerms in candidateList:
         print(word_from_positions(term, content), end = " ")
     print('\n-----')
 
-fileNameCandidates = os.path.join("..", "outputs", os.path.splitext(os.path.basename(fileName))[0] + "-candidates.txt")
+fileNameCandidates = os.path.join("..", "outputs", os.path.splitext(os.path.basename(fileName))[0] + "-annotation.json")
+
+# format imposed by the usage of Deccano
+# "entities" will contain the positions of the chiasmi terms and "cats" the annotation label
+# Setting default label to "False" to speed up the annotation process
+candidateJson = {"text" : "", "entities" : [], "cats" : "NotAChiasmus"}
+termLetters = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
+
 with open(fileNameCandidates, 'w') as fileOut:
+    
     for candidateBlock, candidateTerms in candidateList:
-        # the newline character separates candidates
-        fileOut.write(word_from_positions(candidateBlock, content).replace("\n", ""))
-        fileOut.write('\n')
-        fileOut.write(str(candidateBlock[0]) + ' ' + str(candidateBlock[1]))
-        for termPair in candidateTerms:
+        candidateJson["text"] = word_from_positions(candidateBlock, content)
+        candidateJson["entities"] = []
+        
+        for letterIndex, termPair in enumerate(candidateTerms):
+            newPair = []
             for term in termPair:
                 term = term - candidateBlock[0]
-                fileOut.write(' ' + str(term))
-        fileOut.write('\n')
+                newPair.append(term)
+            if letterIndex < len(candidateTerms)/2:
+                newPair.append(termLetters[letterIndex])
+            else:
+                newPair.append((termLetters[len(candidateTerms) - letterIndex - 1]) + "\'")
+            candidateJson["entities"].append(newPair)
+        
+        # adding metadata useful for post-annotation processings
+        candidateJson["startBlock"] = candidateBlock[0]
+        candidateJson["endBlock"] = candidateBlock[1]
+
+        fileOut.write(json.dumps(candidateJson))
+        fileOut.write("\n")
+    
     fileOut.close()

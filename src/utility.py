@@ -15,3 +15,28 @@ def ignore_punctuation_and_stopwords(wordIterator, nextWord, stopwords):
             return -1
 
     return nextWord
+    
+def get_file_content(fileName, possibleFolder):
+    try:
+        with open(fileName) as file:
+            print("Loading content of ", fileName, '...')
+            content = file.read()
+            file.close()
+            print("File loaded !")
+            print("-------------")
+            print()
+            return content
+    except IOError:
+        try:
+            secondFileName = possibleFolder + fileName
+            with open(secondFileName) as file:
+                print("Loading content of ", secondFileName, '...')
+                content = file.read()
+                file.close()
+                print("File loaded !")
+                print("-------------")
+                print()
+                return content
+        except IOError:
+            print("File ", fileName, " not found.")
+            return -1

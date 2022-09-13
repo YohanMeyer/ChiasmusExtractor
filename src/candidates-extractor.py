@@ -18,17 +18,13 @@ from utility import *
 # -- Initializing the project --
 
 if __name__ == '__main__' and len(sys.argv) >= 2:
-    fileName = '../inputs/' + sys.argv[1]
+    fileName = sys.argv[1]
 else:
     fileName = input('Enter the name of the file to process : ')
 
-with open(fileName) as file:
-    print("Loading content of ", fileName, '...')
-    content = file.read()
-    file.close()
-    print("File loaded !")
-    print("-------------")
-    print()
+content = get_file_content(fileName, "../inputs/")
+if(content == -1):
+    exit(0)
 
 
 # -- Initializing the Stanza pipeline and GloVe embedding for further processing --

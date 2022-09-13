@@ -1,14 +1,13 @@
 # Generated files
-*-candidates.txt
-
-# MacOS files
-**/**DS_Store
+outputs/
 
 # Embedding database
 GloVe/
 
-# Outputs
-outputs/
+# MacOS and personal files
+**/**DS_Store
+TODO.txt
+**/**test*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -2,9 +2,11 @@
 
 The repository containing all work concerning data retrieval and annotation for our masterthesis.
 
-## Specifications for the annotation tool
+## Global specifications for the annotation tool
 
 ### Goal : provide a tool for efficient annotation of chiasmi
+
+[TODO] update
 
 #### First step : candidate extraction
 __Input__ : Text containing chiasmi candidates \
@@ -24,6 +26,28 @@ __Input format__ : Two separate .txt files (one with the original raw text and o
 __Output__ : A .xml file containing the annotated text \
 __Output format__ : specified by Harris et al. (2018)
 
+
+## Candidate extraction tool
+
+[TODO] A few words about its functioning + how to run it
+
+## Annotation tool
+
+### How to use Doccano
+
+We decided to integrate the free and open-source software Doccano to facilitate the manual annotation process.
+For more details, please refer to their GitHub or documentation page : 
+- https://github.com/doccano/doccano
+- https://doccano.github.io/doccano/
+
+#### How to run it locally
+
+[TODO]
+
+#### With Docker
+
+Please note that having Docker installed is a prerequisite.
+[TODO]
 
 
 

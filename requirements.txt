@@ -1,3 +1,4 @@
 embeddings==0.0.8
 nltk==3.7
 stanza==1.4.0
+doccano==1.8.0

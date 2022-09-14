@@ -36,13 +36,8 @@ print("figure :", figureName)
 # -- Tidying up the annotated file --
 
 annotatedTrueJson = [dict for dict in annotatedJson if len(dict["cats"]) == 1 and dict["cats"][0] == "TrueChiasmus"]
-annotatedTrueJson = sorted(annotatedTrueJson, key=lambda d: (d["startBlock"], d['entities'][0][0]))
-# print(str(len(annotatedTrueJson)) + " chiasmi annotated as True.")
-# print("-----")
-# for line in annotatedTrueJson:
-#     print(line)
-#     print()
-# print("-----")
+annotatedTrueJson = sorted(annotatedTrueJson, key=lambda d: (d["startBlock"] + d['entities'][0][0], d['entities'][1][0]))
+
 
 annotatedXMLFileName = os.path.join("..", "annotated", os.path.splitext(os.path.basename(annotatedFileName))[0] + ".xml")
 
@@ -56,7 +51,6 @@ for trueChiasmus in annotatedTrueJson:
     
     startBlock = trueChiasmus["startBlock"]
     startChiasmus = startBlock + trueChiasmus["entities"][0][0]
-    # print("startChiasmus :", startChiasmus, "; startBlock :", trueChiasmus["startBlock"])
     if(textIndex == 0 and figureIndex == 0):
         document.text = rawContent[0:startChiasmus]
         textIndex = startChiasmus
@@ -79,7 +73,6 @@ for trueChiasmus in annotatedTrueJson:
         figureTextIndex = term[1]
         
     textIndex = startBlock + trueChiasmus["entities"][-1][1]
-    # print('textIndex end of loop :', textIndex)
     figureIndex += 1
     
 newXMLFigure.tail = rawContent[textIndex:]
@@ -89,12 +82,5 @@ with open(annotatedXMLFileName, 'w') as fileOut:
     fileOut.write(xmlString)
     fileOut.close()
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
+print("\n---------")
+print("Annotated XML file stored in", annotatedXMLFileName)

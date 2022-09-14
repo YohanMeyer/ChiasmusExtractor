@@ -51,14 +51,15 @@ def process_next_word(currentTerm, currentId, storageTable, matchTable, startBlo
         # we have a match ! Let's update the storage table
         storageTable[currentTerm].append(currentId)
 
-        # compute all possible pairs for the new match (A in A B B A)
-        newPairs = [currentTerm, list(itertools.combinations(storageTable[currentTerm], 2))]
+        # compute all possible pairs for the new match (A in A B B A) (not optimized)
+        newPairs = list(itertools.combinations(storageTable[currentTerm], 2))
+        newPairs = [comb for comb in newPairs if currentId in comb]
 
         # compute all possible pairs of old matches (B in A B B A)
         oldMatches = [(oldTerm, list(itertools.combinations(matchTable[oldTerm], 2))) for oldTerm in matchTable]
         
         # iterate over all pairs for the new match
-        for newPair in newPairs[1]:
+        for newPair in newPairs:
           # iterate over all old matches
           for oldMatch in oldMatches:
             oldTerm = oldMatch[0]
@@ -179,3 +180,6 @@ with open(fileNameCandidates, 'w') as fileOut:
         fileOut.write("\n")
     
     fileOut.close()
+
+print("\n---------")
+print("Candidates stored in", fileNameCandidates)

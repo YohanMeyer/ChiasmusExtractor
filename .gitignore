@@ -1,10 +1,7 @@
-# Generated files
-outputs/
-
 # Embedding database
 GloVe/
 
-# MacOS and personal files
+# MacOS and dev files
 **/**DS_Store
 TODO.txt
 **/**test*

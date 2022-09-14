@@ -22,7 +22,7 @@ if __name__ == '__main__' and len(sys.argv) >= 2:
 else:
     fileName = input('Enter the name of the file to process : ')
 
-content = get_file_content(fileName, "../inputs/")
+content = get_file_content(fileName, "inputs")
 if(content == -1):
     exit(0)
 
@@ -139,17 +139,14 @@ for nextWord, oldWord in zip(wordsFront, wordsBack):
         else:
             del matchTable[oldLemma][0]
 
-# [TBD] : process the last 30 words of the file !
+# print('-------\ncandidate list (', len(candidateList), ' candidates):')
+# for candidateBlock, candidateTerms in candidateList:
+#     print(word_from_positions(candidateBlock, content))
+#     for term in candidateTerms:
+#         print(word_from_positions(term, content), end = " ")
+#     print('\n-----')
 
-
-print('-------\ncandidate list (', len(candidateList), ' candidates):')
-for candidateBlock, candidateTerms in candidateList:
-    print(word_from_positions(candidateBlock, content))
-    for term in candidateTerms:
-        print(word_from_positions(term, content), end = " ")
-    print('\n-----')
-
-fileNameCandidates = os.path.join("..", "outputs", os.path.splitext(os.path.basename(fileName))[0] + "-annotation.json")
+fileNameCandidates = os.path.join("..", "annotation", os.path.splitext(os.path.basename(fileName))[0] + "-annotator.jsonl")
 
 # format imposed by the usage of Deccano
 # "entities" will contain the positions of the chiasmi terms and "cats" the annotation label
@@ -169,9 +166,9 @@ with open(fileNameCandidates, 'w') as fileOut:
                 term = term - candidateBlock[0]
                 newPair.append(term)
             if letterIndex < len(candidateTerms)/2:
-                newPair.append(termLetters[letterIndex])
+                newPair.append(termLetters[letterIndex] + "-1")
             else:
-                newPair.append((termLetters[len(candidateTerms) - letterIndex - 1]) + "\'")
+                newPair.append((termLetters[len(candidateTerms) - letterIndex - 1]) + "-2")
             candidateJson["entities"].append(newPair)
         
         # adding metadata useful for post-annotation processings

@@ -43,9 +43,8 @@ stopwords = set(line.strip() for line in open('stopwords.txt'))
 
 # -- Processing function for each next word --
 
-
 def append_to_candidates(candidateList: list, startBlock: int, endBlock: int,
-                         A1: str, B1: str, B2: str, A2: str,
+                         A1: int, B1: int, B2: int, A2: int,
                          A1_len: int, B1_len: int, B2_len: int, A2_len: int):
     candidateList.append([
         [startBlock, endBlock + 25], [[A1, A1 + A1_len],
@@ -53,8 +52,24 @@ def append_to_candidates(candidateList: list, startBlock: int, endBlock: int,
                                       [B2, B2 + B2_len],
                                       [A2, A2 + A2_len]]
     ])
+    
+def append_nested_to_candidates(candidateList: list, startBlock: int, endBlock: int,
+                         A1: int, A2: int, A1_len: int, A2_len: int, nestedCandidate: list):
+    newCandidate= [[startBlock, endBlock + 25], [[A1, A1 + A1_len]]]
+    for nestedTerm in nestedCandidate[1]:
+        newCandidate[1].append(nestedTerm)
+    
+    newCandidate[1].append([A2, A2 + A2_len])
+    candidateList.append(newCandidate)
 
-
+def search_nested_chiasmi(currentMatch, candidateList):
+    
+    for candidate in reversed(candidateList):
+        if(candidate[1][-1][1] <= currentMatch[0]):
+            break
+        elif(candidate[1][0][0] > currentMatch[0] and candidate[1][-1][1] < currentMatch[1]):
+            return candidate
+    return -1
 
 def process_next_word(currentWord, currentId, storageTableLemma, matchTableLemma,
                       storageTableEmbedding, matchTableEmbedding, startBlock, endBlock):
@@ -62,35 +77,45 @@ def process_next_word(currentWord, currentId, storageTableLemma, matchTableLemma
 
     currentTerm = currentWord.lemma
     if currentTerm in storageTableLemma:
-        # we have a match ! Let's update the storage table
+        # we have a new match ! Let's update the storage table
         storageTableLemma[currentTerm].append(currentId)
 
-        # compute all possible pairs for the new match (A in A B B A) (not optimized)
-        newPairs = list(itertools.combinations(storageTableLemma[currentTerm], 2))
-        newPairs = [comb for comb in newPairs if currentId in comb]
-
+        # compute all pairs for the new match (A in A B B A)
+        newPairs = list((termId, currentId) for termId in storageTableLemma[currentTerm] if termId != currentId)
+        
         # compute all possible pairs of old matches (B in A B B A)
         oldMatches = [(oldTerm, list(itertools.combinations(matchTableLemma[oldTerm], 2))) for oldTerm in matchTableLemma]
         
         # iterate over all pairs for the new match
         for newPair in newPairs:
-          # iterate over all old matches
-          for oldMatch in oldMatches:
-            oldTerm = oldMatch[0]
-            # iterate over all pairs from the old match to check if it is inside the new match
-            for oldPair in oldMatch[1]:
-                if oldPair[0] > newPair[0] and oldPair[1] < newPair[1]:
-                    # found a chiasmus candidate                
-                    # we need, for each candidate : 
-                    #   - the position in the raw text of the first character of the first word of the block
-                    #   - the position in the raw text of the last character of the 5th word coming after the block
-                    #       -> currently, we take the subsequent 25 characters
-                    #   - the position in the block of the words forming the candidate
-                    append_to_candidates(
-                        candidateList, startBlock, endBlock,
-                        newPair[0], oldPair[0], oldPair[1], newPair[1],
-                        len(currentTerm), len(oldTerm), len(oldTerm), len(currentTerm)
-                    )
+            # check if the chiasmus contains more than two pairs
+            nestedCandidate = search_nested_chiasmi(newPair, candidateList)
+            if(nestedCandidate != -1):
+                append_nested_to_candidates(
+                    candidateList, startBlock, endBlock,
+                    newPair[0], newPair[1],
+                    len(currentTerm), len(currentTerm), nestedCandidate
+                )
+                continue
+            
+            # iterate over all old matches
+            for oldMatch in oldMatches:
+                oldTerm = oldMatch[0]
+                
+                # iterate over all pairs from the old match to check if it is inside the new match
+                for oldPair in oldMatch[1]:
+                    if oldPair[0] > newPair[0] and oldPair[1] < newPair[1]:
+                        # found a chiasmus candidate                
+                        # we need, for each candidate : 
+                        #   - the position in the raw text of the first character of the first word of the block
+                        #   - the position in the raw text of the last character of the 5th word coming after the block
+                        #       -> currently, we take the subsequent 25 characters
+                        #   - the position in the block of the words forming the candidate
+                        append_to_candidates(
+                            candidateList, startBlock, endBlock,
+                            newPair[0], oldPair[0], oldPair[1], newPair[1],
+                            len(currentTerm), len(oldTerm), len(oldTerm), len(currentTerm)
+                        )
 
         # update the match table
         matchTableLemma[currentTerm] = copy.deepcopy(storageTableLemma[currentTerm])
@@ -129,7 +154,6 @@ def process_next_word(currentWord, currentId, storageTableLemma, matchTableLemma
 
     # Updating the embedding storage table
     storageTableEmbedding[currentId] = (currentEmb, currentLen)
-
 
 
 # -- Creating the general variables --

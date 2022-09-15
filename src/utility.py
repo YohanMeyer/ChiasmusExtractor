@@ -25,6 +25,7 @@ def ignore_punctuation_and_stopwords(wordIterator, nextWord, stopwords):
 
     return nextWord
 
+
 # -- Embedding utilities --
 
 
@@ -39,7 +40,9 @@ def glove_emb(word: str) -> FloatTensor:
 def emb_similarity(emb1: FloatTensor, emb2: FloatTensor) -> float:
     return torch.cosine_similarity(emb1, emb2, dim=0).item()
 
+
 # -- File utilities --
+
 
 def get_file_content(fileName, possibleFolder):
     try:

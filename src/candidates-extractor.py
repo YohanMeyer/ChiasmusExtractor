@@ -66,7 +66,7 @@ def process_next_word(currentWord, currentId, storageTableLemma, matchTableLemma
         storageTableLemma[currentTerm].append(currentId)
 
         # compute all possible pairs for the new match (A in A B B A) (not optimized)
-        newPairs = list(itertools.combinations(storageTable[currentTerm], 2))
+        newPairs = list(itertools.combinations(storageTableLemma[currentTerm], 2))
         newPairs = [comb for comb in newPairs if currentId in comb]
 
         # compute all possible pairs of old matches (B in A B B A)

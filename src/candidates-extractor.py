@@ -1,6 +1,7 @@
 import itertools
 import copy
 import sys
+import json
 
 import stanza
 from stanza.pipeline.core import DownloadMethod
@@ -21,7 +22,7 @@ if __name__ == '__main__' and len(sys.argv) >= 2:
 else:
     fileName = input('Enter the name of the file to process : ')
 
-content = get_file_content(fileName, "../inputs/")
+content = get_file_content(fileName, "inputs")
 if(content == -1):
     exit(0)
 
@@ -64,14 +65,15 @@ def process_next_word(currentWord, currentId, storageTableLemma, matchTableLemma
         # we have a match ! Let's update the storage table
         storageTableLemma[currentTerm].append(currentId)
 
-        # compute all possible pairs for the new match (A in A B B A)
-        newPairs = [currentTerm, list(itertools.combinations(storageTableLemma[currentTerm], 2))]
+        # compute all possible pairs for the new match (A in A B B A) (not optimized)
+        newPairs = list(itertools.combinations(storageTable[currentTerm], 2))
+        newPairs = [comb for comb in newPairs if currentId in comb]
 
         # compute all possible pairs of old matches (B in A B B A)
         oldMatches = [(oldTerm, list(itertools.combinations(matchTableLemma[oldTerm], 2))) for oldTerm in matchTableLemma]
         
         # iterate over all pairs for the new match
-        for newPair in newPairs[1]:
+        for newPair in newPairs:
           # iterate over all old matches
           for oldMatch in oldMatches:
             oldTerm = oldMatch[0]
@@ -194,26 +196,46 @@ for nextWord, oldWord in zip(wordsFront, wordsBack):
         else:
             del lemmaMatchTable[oldLemma][0]
 
-# [TBD] : process the last 30 words of the file !
+# print('-------\ncandidate list (', len(candidateList), ' candidates):')
+# for candidateBlock, candidateTerms in candidateList:
+#     print(word_from_positions(candidateBlock, content))
+#     for term in candidateTerms:
+#         print(word_from_positions(term, content), end = " ")
+#     print('\n-----')
 
+fileNameCandidates = os.path.join("..", "annotation", os.path.splitext(os.path.basename(fileName))[0] + "-annotator.jsonl")
 
-print('-------\ncandidate list (', len(candidateList), ' candidates):')
-for candidateBlock, candidateTerms in candidateList:
-    print(word_from_positions(candidateBlock, content))
-    for term in candidateTerms:
-        print(word_from_positions(term, content), end = " ")
-    print('\n-----')
+# format imposed by the usage of Deccano
+# "entities" will contain the positions of the chiasmi terms and "cats" the annotation label
+# Setting default label to "False" to speed up the annotation process
+candidateJson = {"text" : "", "entities" : [], "cats" : "NotAChiasmus"}
+termLetters = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
 
-fileNameCandidates = os.path.join("..", "outputs", os.path.splitext(os.path.basename(fileName))[0] + "-candidates.txt")
 with open(fileNameCandidates, 'w') as fileOut:
+    
     for candidateBlock, candidateTerms in candidateList:
-        # the newline character separates candidates
-        fileOut.write(word_from_positions(candidateBlock, content).replace("\n", ""))
-        fileOut.write('\n')
-        fileOut.write(str(candidateBlock[0]) + ' ' + str(candidateBlock[1]))
-        for termPair in candidateTerms:
+        candidateJson["text"] = word_from_positions(candidateBlock, content)
+        candidateJson["entities"] = []
+        
+        for letterIndex, termPair in enumerate(candidateTerms):
+            newPair = []
             for term in termPair:
                 term = term - candidateBlock[0]
-                fileOut.write(' ' + str(term))
-        fileOut.write('\n')
+                newPair.append(term)
+            if letterIndex < len(candidateTerms)/2:
+                newPair.append(termLetters[letterIndex] + "-1")
+            else:
+                newPair.append((termLetters[len(candidateTerms) - letterIndex - 1]) + "-2")
+            candidateJson["entities"].append(newPair)
+        
+        # adding metadata useful for post-annotation processings
+        candidateJson["startBlock"] = candidateBlock[0]
+        candidateJson["endBlock"] = candidateBlock[1]
+
+        fileOut.write(json.dumps(candidateJson))
+        fileOut.write("\n")
+    
     fileOut.close()
+
+print("\n---------")
+print("Candidates stored in", fileNameCandidates)

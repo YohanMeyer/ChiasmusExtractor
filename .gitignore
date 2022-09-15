@@ -1,11 +1,10 @@
-# Generated files
-outputs/
-
 # Embedding database
 GloVe/
 
-# MacOS files
+# MacOS and dev files
 **/**DS_Store
+TODO.txt
+**/**test*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

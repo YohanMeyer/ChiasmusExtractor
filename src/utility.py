@@ -24,8 +24,7 @@ def ignore_punctuation_and_stopwords(wordIterator, nextWord, stopwords):
             return -1
 
     return nextWord
-
-
+    
 # -- Embedding utilities --
 
 
@@ -42,29 +41,17 @@ def emb_similarity(emb1: FloatTensor, emb2: FloatTensor) -> float:
 
 
 # -- File utilities --
-
-
-def get_file_content(fileName, possibleFolder):
+    
+def get_file_content(fileName, folder):
+    filePath = os.path.join("..", folder, fileName)
     try:
-        with open(fileName) as file:
-            print("Loading content of ", fileName, '...')
+        with open(filePath) as file:
+            print("Loading content of", filePath, '...')
             content = file.read()
             file.close()
             print("File loaded !")
-            print("-------------")
-            print()
+            print("-------------\n\n")
             return content
     except IOError:
-        try:
-            secondFileName = possibleFolder + fileName
-            with open(secondFileName) as file:
-                print("Loading content of ", secondFileName, '...')
-                content = file.read()
-                file.close()
-                print("File loaded !")
-                print("-------------")
-                print()
-                return content
-        except IOError:
-            print("File ", fileName, " not found.")
-            return -1
+        print("File", filePath, "not found.")
+        return -1

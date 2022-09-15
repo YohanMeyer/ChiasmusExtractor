@@ -25,7 +25,6 @@ def ignore_punctuation_and_stopwords(wordIterator, nextWord, stopwords):
 
     return nextWord
 
-
 # -- Embedding utilities --
 
 
@@ -39,3 +38,30 @@ def glove_emb(word: str) -> FloatTensor:
 
 def emb_similarity(emb1: FloatTensor, emb2: FloatTensor) -> float:
     return torch.cosine_similarity(emb1, emb2, dim=0).item()
+
+# -- File utilities --
+
+def get_file_content(fileName, possibleFolder):
+    try:
+        with open(fileName) as file:
+            print("Loading content of ", fileName, '...')
+            content = file.read()
+            file.close()
+            print("File loaded !")
+            print("-------------")
+            print()
+            return content
+    except IOError:
+        try:
+            secondFileName = possibleFolder + fileName
+            with open(secondFileName) as file:
+                print("Loading content of ", secondFileName, '...')
+                content = file.read()
+                file.close()
+                print("File loaded !")
+                print("-------------")
+                print()
+                return content
+        except IOError:
+            print("File ", fileName, " not found.")
+            return -1

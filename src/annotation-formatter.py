@@ -15,10 +15,11 @@ if __name__ == '__main__' and len(sys.argv) == 3:
 else:
     if __name__ == '__main__' and len(sys.argv) == 2:
         fileName = sys.argv[1]
+        annotatedFileName = fileName + '-annotated.jsonl'
+        rawFileName = fileName + '.txt'
     else:
-        fileName = input('Enter the name of the original file without the extension : ')
-    annotatedFileName = fileName + '-annotated.jsonl'
-    rawFileName = fileName + '.txt'
+        rawFileName = input('Enter the name of the original file : ')
+        annotatedFileName = input('Enter the name of the annotated file : ')
 
 annotatedJson = []
 with jsonlines.open(os.path.join("..", "annotated", annotatedFileName)) as reader:

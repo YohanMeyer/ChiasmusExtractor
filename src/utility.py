@@ -1,3 +1,12 @@
+import os
+from embeddings import GloveEmbedding
+import torch
+from torch import FloatTensor
+
+
+# -- Text utilities --
+
+
 def first_word_from(text, word_begin):
     return text[word_begin:].split(maxsplit=1)[0].lower()
 
@@ -15,3 +24,18 @@ def ignore_punctuation_and_stopwords(wordIterator, nextWord, stopwords):
             return -1
 
     return nextWord
+
+
+# -- Embedding utilities --
+
+
+os.environ['HOME'] = os.path.join('..', 'GloVe')
+glove = GloveEmbedding('common_crawl_48', d_emb=300, show_progress=True)
+
+
+def glove_emb(word: str) -> FloatTensor:
+    return FloatTensor(glove.emb(word))
+
+
+def emb_similarity(emb1: FloatTensor, emb2: FloatTensor) -> float:
+    return torch.cosine_similarity(emb1, emb2, dim=0).item()

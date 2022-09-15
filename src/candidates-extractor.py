@@ -1,17 +1,17 @@
 import itertools
 import copy
-import os.path
 import sys
 
 import stanza
 from stanza.pipeline.core import DownloadMethod
 from nltk.tokenize import wordpunct_tokenize
-from embeddings import GloveEmbedding
 
 from utility import *
 
 # doc for stanza : https://stanfordnlp.github.io/stanza/data_objects#document
 # Stopwords downloaded on https://www.ranks.nl/stopwords and manually modified
+
+SIMILARITY_LIMIT = 0.7
 
 
 # -- Initializing the project --
@@ -29,7 +29,7 @@ with open(fileName) as file:
     file.close()
 
 
-# -- Initializing the Stanza pipeline and GloVe embedding for further processing --
+# -- Initializing the Stanza pipeline --
 
 stanza.download('en', processors='tokenize, lemma, pos')
 processingPipeline = stanza.Pipeline('en', processors='tokenize, lemma, pos', download_method=DownloadMethod.REUSE_RESOURCES)
@@ -40,24 +40,24 @@ wordsBack = doc.iter_words()
 
 stopwords = set(line.strip() for line in open('stopwords.txt'))
 
-os.environ['HOME'] = os.path.join('..', 'GloVe')
-g = GloveEmbedding('common_crawl_48', d_emb=300, show_progress=True)
-
 # We have corresponding lemmas for each word. We need to initialize a window of 30 lemmas and put them in a hash
 # table. Every time we have a match -> verify if we have a match inside
 
 # -- Processing function for each next word --
 
-def process_next_word(currentTerm, currentId, storageTable, matchTable, startBlock, endBlock):
-    if currentTerm in storageTable:
+def process_next_word(currentWord, currentId, storageTableLemma, matchTableLemma,
+                      storageTableEmbedding, matchTableEmbedding, startBlock, endBlock):
+    # Search of chiasmi through lemma correspondence
+    currentTerm = currentWord.lemma
+    if currentTerm in storageTableLemma:
         # we have a match ! Let's update the storage table
-        storageTable[currentTerm].append(currentId)
+        storageTableLemma[currentTerm].append(currentId)
 
         # compute all possible pairs for the new match (A in A B B A)
-        newPairs = [currentTerm, list(itertools.combinations(storageTable[currentTerm], 2))]
+        newPairs = [currentTerm, list(itertools.combinations(storageTableLemma[currentTerm], 2))]
 
         # compute all possible pairs of old matches (B in A B B A)
-        oldMatches = [(oldTerm, list(itertools.combinations(matchTable[oldTerm], 2))) for oldTerm in matchTable]
+        oldMatches = [(oldTerm, list(itertools.combinations(matchTableLemma[oldTerm], 2))) for oldTerm in matchTableLemma]
         
         # iterate over all pairs for the new match
         for newPair in newPairs[1]:
@@ -76,10 +76,18 @@ def process_next_word(currentTerm, currentId, storageTable, matchTable, startBlo
                     candidateList.append([[startBlock, endBlock + 25], [[newPair[0], newPair[0] + len(currentTerm)], [oldPair[0], oldPair[0] + len(oldTerm)], [oldPair[1], oldPair[1] + len(oldTerm)], [newPair[1], newPair[1] + len(currentTerm)]]])
 
         # update the match table
-        matchTable[currentTerm] = copy.deepcopy(storageTable[currentTerm])
+        matchTableLemma[currentTerm] = copy.deepcopy(storageTableLemma[currentTerm])
     else:
         # no match, let's update the storage table
-        storageTable[currentTerm] = [currentId]
+        storageTableLemma[currentTerm] = [currentId]
+
+    # Search of chiasmi through embedding (semantic) similarity
+    currentEmb = glove_emb(currentWord.text)
+    for emb in storageTableEmbedding:
+        similarity = emb_similarity(currentEmb, emb)
+        if similarity > SIMILARITY_LIMIT or similarity < -SIMILARITY_LIMIT:
+            pass
+
 
 # -- Creating the general variables --
 
@@ -97,7 +105,7 @@ for _ in range(30):
     if(nextWord == -1):
         break
         
-    process_next_word(nextWord.lemma, nextWord.parent.start_char, lemmaTable, matchTable, 0, nextWord.parent.end_char)
+    process_next_word(nextWord, nextWord.parent.start_char, lemmaTable, matchTable, 0, nextWord.parent.end_char)
 
 # -- Main part : make the window slide using wordsFront and wordsBack --
 #    (Same algorithm but delete info relevant to wordsBack when moving forward)

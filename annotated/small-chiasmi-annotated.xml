@@ -6,11 +6,11 @@
          a 
         <chiasmus-B-1>thing</chiasmus-B-1>
          as it was having the power to stop 
-        <chiasmus-B-2>thing</chiasmus-B-2>
-        s from being 
-        <chiasmus-A-2>do</chiasmus-A-2>
+        <chiasmus-B-2>things</chiasmus-B-2>
+         from being 
+        <chiasmus-A-2>done</chiasmus-A-2>
     </chiasmus-0>
-    ne to you.
+     to you.
 But shall I 
     <chiasmus-1>
         <chiasmus-A-1>live</chiasmus-A-1>
@@ -39,8 +39,8 @@ Starkist doesn't want tuna with
          
         <chiasmus-B-1>taste</chiasmus-B-1>
         , Starkist wants tuna that 
-        <chiasmus-B-2>taste</chiasmus-B-2>
-        s 
+        <chiasmus-B-2>tastes</chiasmus-B-2>
+         
         <chiasmus-A-2>good</chiasmus-A-2>
     </chiasmus-3>
     !
@@ -60,15 +60,15 @@ He went to the country, to the town went she.
 He came in triumph and in defeat departs.
 And 
     <chiasmus-5>
-        <chiasmus-A-1>sing</chiasmus-A-1>
-        ing still dost 
+        <chiasmus-A-1>singing</chiasmus-A-1>
+         still dost 
         <chiasmus-B-1>soar</chiasmus-B-1>
          and 
-        <chiasmus-B-2>soar</chiasmus-B-2>
-        ing ever 
-        <chiasmus-A-2>sing</chiasmus-A-2>
+        <chiasmus-B-2>soaring</chiasmus-B-2>
+         ever 
+        <chiasmus-A-2>singest</chiasmus-A-2>
     </chiasmus-5>
-    est. We 
+    . We 
     <chiasmus-6>
         <chiasmus-A-1>live</chiasmus-A-1>
          to 
@@ -86,45 +86,31 @@ I am a man. Or am I ?
         <chiasmus-A-1>Baby</chiasmus-A-1>
         , 
         <chiasmus-B-1>you</chiasmus-B-1>
-        've been so distant from me lately. And lately, don't even want to call 
+        've been so distant from me 
+        <chiasmus-C-1>lately</chiasmus-C-1>
+        . And 
+        <chiasmus-C-2>lately</chiasmus-C-2>
+        , don't even want to call 
         <chiasmus-B-2>you</chiasmus-B-2>
          
         <chiasmus-A-2>baby</chiasmus-A-2>
     </chiasmus-7>
-    <chiasmus-8>
-        <chiasmus-A-1>Baby</chiasmus-A-1>
-        , you've been so distant from me 
-        <chiasmus-B-1>lately</chiasmus-B-1>
-        . And 
-        <chiasmus-B-2>lately</chiasmus-B-2>
-        , don't even want to call you 
-        <chiasmus-A-2>baby</chiasmus-A-2>
-    </chiasmus-8>
-    <chiasmus-9>
-        <chiasmus-A-1>you</chiasmus-A-1>
-        've been so distant from me 
-        <chiasmus-B-1>lately</chiasmus-B-1>
-        . And 
-        <chiasmus-B-2>lately</chiasmus-B-2>
-        , don't even want to call 
-        <chiasmus-A-2>you</chiasmus-A-2>
-    </chiasmus-9>
-     baby.
+    .
 What 
-    <chiasmus-10>
+    <chiasmus-8>
         <chiasmus-A-1>warning</chiasmus-A-1>
          has no 
         <chiasmus-B-1>end</chiasmus-B-1>
          and 
-        <chiasmus-B-2>end</chiasmus-B-2>
-        s without 
+        <chiasmus-B-2>ends</chiasmus-B-2>
+         without 
         <chiasmus-A-2>warning</chiasmus-A-2>
-    </chiasmus-10>
+    </chiasmus-8>
     ?
 Capital employs labour. Even this relation in its simplicity is a personification of things and a reification of persons. -Karl Marx
 Such is the aestheticizing of politics, as practiced by fascism. Communism replies by politicizing art. -Walter Benjamin
 
-    <chiasmus-11>
+    <chiasmus-9>
         <chiasmus-A-1>Consciousness</chiasmus-A-1>
          of 
         <chiasmus-B-1>desire</chiasmus-B-1>
@@ -132,19 +118,19 @@ Such is the aestheticizing of politics, as practiced by fascism. Communism repli
         <chiasmus-B-2>desire</chiasmus-B-2>
          for 
         <chiasmus-A-2>consciousness</chiasmus-A-2>
-    </chiasmus-11>
+    </chiasmus-9>
      together and indissolubly constitute that project which in its negative form has as its goal the abolition of classes and the direct possession by the workers of every aspect of their activity -Guy Debord
 What is 
-    <chiasmus-12>
+    <chiasmus-10>
         <chiasmus-A-1>meaningful</chiasmus-A-1>
          
-        <chiasmus-B-1>bring</chiasmus-B-1>
-        s joy and what 
-        <chiasmus-B-2>bring</chiasmus-B-2>
-        s joy is 
+        <chiasmus-B-1>brings</chiasmus-B-1>
+         joy and what 
+        <chiasmus-B-2>brings</chiasmus-B-2>
+         joy is 
         <chiasmus-A-2>meaningful</chiasmus-A-2>
-    </chiasmus-12>
-    <chiasmus-13>
+    </chiasmus-10>
+    <chiasmus-11>
         <chiasmus-A-1>meaningful</chiasmus-A-1>
          brings 
         <chiasmus-B-1>joy</chiasmus-B-1>
@@ -152,7 +138,7 @@ What is
         <chiasmus-B-2>joy</chiasmus-B-2>
          is 
         <chiasmus-A-2>meaningful</chiasmus-A-2>
-    </chiasmus-13>
+    </chiasmus-11>
     .
 
 </document>

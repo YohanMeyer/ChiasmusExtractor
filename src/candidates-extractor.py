@@ -20,6 +20,8 @@ if __name__ == '__main__' and len(sys.argv) >= 2:
     fileName = sys.argv[1]
 else:
     fileName = input('Enter the name of the file to process : ')
+    if fileName == "":
+        fileName = "small-chiasmi.txt"
 
 content = get_file_content(fileName, "../inputs/")
 if(content == -1):
@@ -110,8 +112,11 @@ def process_next_word(currentWord, currentId, startBlock, endBlock):
 
     # --- Search of chiasmi through embedding (semantic) similarity (!!! YET UNTESTED !!!)
 
-    currentEmb = glove_emb(currentWord.text)
-    currentLen = len(currentWord.text)
+    currentText = currentWord.text
+    # print(f"<<WINDOW>>\t{word_from_positions((startBlock, endBlock), content)}")
+    # print(f"<<CURRENT WORD>>\t{currentText}")
+    currentEmb = glove_emb(currentText)
+    currentLen = len(currentText)
 
     # Search for possible matches
     for oldWordId, (emb, oldWordLen) in storageTableEmbedding.items():
@@ -178,6 +183,7 @@ for nextWord, oldWord in zip(wordsFront, wordsBack):
 
     oldWord = ignore_punctuation_and_stopwords(wordsBack, oldWord, stopwords)
     oldLemma = oldWord.lemma
+    oldId = oldWord.parent.start_char
     startBlock = oldWord.parent.start_char
 
     # Processing the front of the window
@@ -197,8 +203,16 @@ for nextWord, oldWord in zip(wordsFront, wordsBack):
         else:
             del matchTableLemma[oldLemma][0]
 
-# [TBD] : process the last 30 words of the file !
+    # Deleting the old word (now out of window) from the embedding tables
+    del storageTableEmbedding[oldId]
+    if oldId in matchTableEmbedding:
+        for _ in range(len(matchTableEmbedding[oldId])):
+            del matchTableEmbedding[oldId][0]
+        del matchTableEmbedding[oldId]
 
+
+
+# [TBD] : process the last 30 words of the file !
 
 print('-------\ncandidate list (', len(candidateList), ' candidates):')
 for candidateBlock, candidateTerms in candidateList:

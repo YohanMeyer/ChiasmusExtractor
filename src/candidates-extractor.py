@@ -40,10 +40,21 @@ stopwords = set(line.strip() for line in open('stopwords.txt'))
 # We have corresponding lemmas for each word. We need to initialize a window of 30 lemmas and put them in a hash
 # table. Every time we have a match -> verify if we have a match inside
 
+
+# -- Creating the general variables --
+
+
+candidateList = []
+storageTableLemma = {}
+matchTableLemma = {}
+storageTableEmbedding = {}
+matchTableEmbedding = {}
+
+
 # -- Processing function for each next word --
 
 
-def append_to_candidates(candidateList: list, startBlock: int, endBlock: int,
+def append_to_candidates(startBlock: int, endBlock: int,
                          A1: str, B1: str, B2: str, A2: str,
                          A1_len: int, B1_len: int, B2_len: int, A2_len: int):
     candidateList.append([
@@ -54,9 +65,9 @@ def append_to_candidates(candidateList: list, startBlock: int, endBlock: int,
     ])
 
 
+def process_next_word(currentWord, currentId, startBlock, endBlock):
+    alreadyDetectedCandidates = []
 
-def process_next_word(currentWord, currentId, storageTableLemma, matchTableLemma,
-                      storageTableEmbedding, matchTableEmbedding, startBlock, endBlock):
     # --- Search of chiasmi through lemma correspondence
 
     currentTerm = currentWord.lemma
@@ -85,10 +96,11 @@ def process_next_word(currentWord, currentId, storageTableLemma, matchTableLemma
                     #       -> currently, we take the subsequent 25 characters
                     #   - the position in the block of the words forming the candidate
                     append_to_candidates(
-                        candidateList, startBlock, endBlock,
+                        startBlock, endBlock,
                         newPair[0], oldPair[0], oldPair[1], newPair[1],
                         len(currentTerm), len(oldTerm), len(oldTerm), len(currentTerm)
                     )
+                    alreadyDetectedCandidates.append((newPair[0], oldPair[0], oldPair[1], newPair[1]))
 
         # update the match table
         matchTableLemma[currentTerm] = copy.deepcopy(storageTableLemma[currentTerm])
@@ -96,7 +108,6 @@ def process_next_word(currentWord, currentId, storageTableLemma, matchTableLemma
         # no match, let's update the storage table
         storageTableLemma[currentTerm] = [currentId]
 
-    return  # Skip the embedding part for now
     # --- Search of chiasmi through embedding (semantic) similarity (!!! YET UNTESTED !!!)
 
     currentEmb = glove_emb(currentWord.text)
@@ -109,16 +120,19 @@ def process_next_word(currentWord, currentId, storageTableLemma, matchTableLemma
             # We have a match! Searching for possible second pairs of matching words
             for oldPair1, matchedWords in matchTableEmbedding.items():
                 # We need the second pairs to be contained withing the first pair,
-                # i.e. its first word to be AFTER the word we orginally matched
+                # i.e. its first word to be AFTER the word we originally matched
                 if oldWordId < oldPair1:
                     oldPair1Len = storageTableEmbedding[oldPair1][1]
                     for oldPair2 in matchedWords:
                         oldPair2len = storageTableEmbedding[oldPair2][1]
-                        append_to_candidates(
-                            candidateList, startBlock, endBlock,
-                            oldWordId, oldPair1, oldPair2, currentId,
-                            oldWordLen, oldPair1Len, oldPair2len, currentLen
-                        )
+                        # Making sure we are only taking into account non-lemma chiasmis:
+                        if (oldWordId, oldPair1, oldPair2, currentId) not in alreadyDetectedCandidates:
+                            append_to_candidates(
+                                startBlock, endBlock,
+                                oldWordId, oldPair1, oldPair2, currentId,
+                                oldWordLen, oldPair1Len, oldPair2len, currentLen
+                            )
+                        print("----")
             # Updating the embedding match table
             if oldWordId in matchTableEmbedding:
                 matchTableEmbedding[oldWordId].append(currentId)
@@ -129,16 +143,8 @@ def process_next_word(currentWord, currentId, storageTableLemma, matchTableLemma
     storageTableEmbedding[currentId] = (currentEmb, currentLen)
 
 
-
-# -- Creating the general variables --
-
-candidateList = []
-lemmaTable = {}
-lemmaMatchTable = {}
-embeddingTable = {}
-embeddingMatchTable = {}
-
 # -- Initializing the sliding window over the first 30 characters --
+
 
 for _ in range(30):
     nextWord = next(wordsFront)
@@ -147,9 +153,8 @@ for _ in range(30):
     # if we reached the end of the file
     if nextWord == -1:
         break
-        
-    process_next_word(nextWord, nextWord.parent.start_char, lemmaTable, lemmaMatchTable,
-                      embeddingTable, embeddingMatchTable, 0, nextWord.parent.end_char)
+
+    process_next_word(nextWord, nextWord.parent.start_char,  0, nextWord.parent.end_char)
 
 # -- Main part : make the window slide using wordsFront and wordsBack --
 #    (Same algorithm but delete info relevant to wordsBack when moving forward)
@@ -177,22 +182,21 @@ for nextWord, oldWord in zip(wordsFront, wordsBack):
     startBlock = oldWord.parent.start_char
 
     # Processing the front of the window
-    process_next_word(nextWord, nextWord.parent.start_char, lemmaTable, lemmaMatchTable,
-                      embeddingTable, embeddingMatchTable, startBlock, nextWord.parent.end_char)
+    process_next_word(nextWord, nextWord.parent.start_char, startBlock, nextWord.parent.end_char)
     
     # handle the rear of the window
     # Delete the word exiting the sliding window from lemmaTable
-    if len(lemmaTable[oldLemma]) <= 1:
-        del lemmaTable[oldLemma]
+    if len(storageTableLemma[oldLemma]) <= 1:
+        del storageTableLemma[oldLemma]
     else:
-        del lemmaTable[oldLemma][0]
+        del storageTableLemma[oldLemma][0]
     # Updating matchTable if necessary after this deletion
-    if oldLemma in lemmaMatchTable:
+    if oldLemma in matchTableLemma:
         # delete when only one occurrence is left - not a match anymore
-        if len(lemmaMatchTable[oldLemma]) <= 2:
-            del lemmaMatchTable[oldLemma]
+        if len(matchTableLemma[oldLemma]) <= 2:
+            del matchTableLemma[oldLemma]
         else:
-            del lemmaMatchTable[oldLemma][0]
+            del matchTableLemma[oldLemma][0]
 
 # [TBD] : process the last 30 words of the file !
 

@@ -34,7 +34,10 @@ glove = GloveEmbedding('common_crawl_48', d_emb=300, show_progress=True)
 
 
 def glove_emb(word: str) -> FloatTensor:
-    return FloatTensor(glove.emb(word))
+    try:
+        return FloatTensor(glove.emb(word))
+    except TypeError:
+        return FloatTensor([0.] * 300)
 
 
 def emb_similarity(emb1: FloatTensor, emb2: FloatTensor) -> float:

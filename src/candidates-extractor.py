@@ -132,7 +132,6 @@ def process_next_word(currentWord, currentId, startBlock, endBlock):
                                 oldWordId, oldPair1, oldPair2, currentId,
                                 oldWordLen, oldPair1Len, oldPair2len, currentLen
                             )
-                        print("----")
             # Updating the embedding match table
             if oldWordId in matchTableEmbedding:
                 matchTableEmbedding[oldWordId].append(currentId)

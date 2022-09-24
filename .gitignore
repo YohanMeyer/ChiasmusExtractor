@@ -1,3 +1,15 @@
+# Outputs
+annotated/
+annotation/
+schneider/candidates
+schneider/fasttext_models
+schneider/gerdracor
+schneider/processed
+schneider/**results.json
+
+# Inputs
+inputs/
+
 # Embedding database
 GloVe/
 

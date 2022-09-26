@@ -15,13 +15,13 @@ def main():
             spacy_model = 'en_core_web_lg'
             )
 
-    print('train with crossvalidation')
-    chidect.train_with_crossval(
-            training_file='data_example/data.json',
-            num_runs=5
-            )
-
-    chidect.print_summary()
+    # print('train with crossvalidation')
+    # chidect.train_with_crossval(
+    #         training_file='data_example/data.json',
+    #         num_runs=5
+    #         )
+    # 
+    # chidect.print_summary()
 
     print('train on whole dataset')
     chidect.train(
@@ -38,6 +38,7 @@ def main():
             id_start="test_"
             )
 
+    print('get top candidates')
     chidect.get_top(
             f'candidates/{fileName}.txt.pkl', 
             f'{fileName}-results.json',

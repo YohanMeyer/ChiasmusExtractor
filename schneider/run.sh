@@ -2,7 +2,7 @@
 GREEN="\033[0;32m"
 NC="\033[0m"
 
-play="schiller-wilhelm-tell"
+file="small-chiasmi"
 
 # check if fasttext model is there
 # if not, then download it
@@ -15,9 +15,8 @@ mkdir -p fasttext_models
     echo -e "${GREEN}### done downloading English fasttext model${NC}"
 
 
-echo -e "${GREEN}### download spacy model if not present${NC}"
+echo -e "${GREEN}### download spacy model${NC}"
 # run only once
-# python3 -m spacy download de_core_news_lg
 # python3 -m spacy download en_core_web_lg
 echo -e "${GREEN}### done downloading spacy model${NC}"
 
@@ -25,5 +24,5 @@ echo -e "${GREEN}### done downloading spacy model${NC}"
 echo -e "${GREEN}### running the experiment${NC}"
 mkdir -p processed
 mkdir -p candidates
-python3 src/chiasmus_example.py ${play}
+python3 src/chiasmus_example.py ${file}
 echo -e "${GREEN}### done running the experiment${NC}"

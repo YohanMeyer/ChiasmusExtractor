@@ -13,7 +13,6 @@ ls = os.listdir
 pj = os.path.join
 
 
-
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.preprocessing import StandardScaler
@@ -41,7 +40,7 @@ class ChiasmusDetector:
         self.chiasmus_regex_pattern = chiasmus_regex_pattern
 
         self.summary = None
-        self.C = C
+        self.C = C # Inverse of regularization strength
 
         self.pos_blacklist = pos_blacklist
         if self.pos_blacklist is None:
@@ -64,6 +63,8 @@ class ChiasmusDetector:
         assert(self.spacy_model is not None)
 
         print("\tprocessing...")
+        # returns a spacy.tokens.doc.Doc object
+        # tokenize and processes the text
         processed = self.spacy_model(text)
 
         print("\textracting...")
@@ -138,6 +139,16 @@ class ChiasmusDetector:
         return candidates
 
     def rate_candidates(self, candidates):
+        # candidates is an array of dicts containing each :
+        # ids [list of 4 integers] : the global ids of the tokens making the candidate
+        # cont_ids [list of 2 integers] : the global ids of the first and last tokens of the context
+        # tokens : list of X strings
+        # lemmas : list of X strings
+        # pos (useless) : list of X strings
+        # dep : list of X strings
+        # vectors (embedding) : list of X numpy.ndarray (each containing 300 values)
+        # candidate_id : string
+        # rating : numpy.float64
         assert(self.model is not None)
         print('\tget features...')
         features = np.asarray([
@@ -158,30 +169,34 @@ class ChiasmusDetector:
 
         with open(pj(text_folder, filename), 'r') as f:
             text = f.read()
+        
+        filename = filename + '.pkl'
 
         # check if processed exists, if yes, don't process
         if os.path.exists(pj(processed_folder, filename)):
-            with open(pj(processed_folder, filename+'.pkl'), 'rb') as f:
+            with open(pj(processed_folder, filename), 'rb') as f:
                 processed = pickle.load(f)
         else:
             print('preprocess')
+            # returns an array of dicts, one dict for each token
+            # each dict contains info about the token
             processed = self.preprocess_text(text)
-            with open(pj(processed_folder, filename)+'.pkl', 'wb') as f:
+            with open(pj(processed_folder, filename), 'wb') as f:
                 pickle.dump(processed, f)
 
         # check if candidates exist, if yes, don't get them new
-        if os.path.exists(pj(processed_folder, filename)):
-            with open(pj(processed_folder, filename)+'.pkl', 'rb') as f:
+        if os.path.exists(pj(candidates_folder, filename)):
+            with open(pj(candidates_folder, filename), 'rb') as f:
                 candidates = pickle.load(f)
         else:
             print('find candidates')
             candidates = self.find_candidates(processed, window_size=20, id_start=id_start)
-            with open(pj(candidates_folder, filename)+'.pkl', 'wb') as f:
+            with open(pj(candidates_folder, filename), 'wb') as f:
                 pickle.dump(candidates, f)
 
         print('rate candidates')
         self.rate_candidates(candidates)
-        with open(pj(candidates_folder, filename)+'.pkl', 'wb') as f:
+        with open(pj(candidates_folder, filename), 'wb') as f:
             pickle.dump(candidates, f)
         pass
 

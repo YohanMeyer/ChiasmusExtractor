@@ -13,6 +13,7 @@ from utility import *
 # Stopwords downloaded on https://www.ranks.nl/stopwords and manually modified
 
 SIMILARITY_LIMIT = 0.7
+Word = stanza.models.common.doc.Word
 
 
 # -- Initializing the project --
@@ -29,8 +30,8 @@ if(content == -1):
 
 # -- Initializing the Stanza pipeline --
 
-stanza.download('en', processors='tokenize, lemma, pos')
-processingPipeline = stanza.Pipeline('en', processors='tokenize, lemma, pos', download_method=DownloadMethod.REUSE_RESOURCES)
+stanza.download('en', processors='tokenize, lemma, pos, depparse')
+processingPipeline = stanza.Pipeline('en', processors='tokenize, lemma, pos, depparse', download_method=DownloadMethod.REUSE_RESOURCES)
 
 doc = processingPipeline(content)
 wordsFront = doc.iter_words()
@@ -44,51 +45,49 @@ stopwords = set(line.strip() for line in open('stopwords.txt'))
 # -- Processing function for each next word --
 
 def append_to_candidates(candidateList: list, startBlock: int, endBlock: int,
-                         A1: int, B1: int, B2: int, A2: int,
-                         A1_len: int, B1_len: int, B2_len: int, A2_len: int):
-    candidateList.append([
-        [startBlock, endBlock + 25], [[A1, A1 + A1_len],
-                                      [B1, B1 + B1_len],
-                                      [B2, B2 + B2_len],
-                                      [A2, A2 + A2_len]]
-    ])
+                         A1: Word, B1: Word, B2: Word, A2: Word):
+# def append_to_candidates(candidateList, startBlock, endBlock,
+#                          A1, B1, B2, A2):
+    candidateList.append([[startBlock, endBlock + 25], [A1, B1, B2, A2]])
     
 def append_nested_to_candidates(candidateList: list, startBlock: int, endBlock: int,
-                         A1: int, A2: int, A1_len: int, A2_len: int, nestedCandidate: list):
-    newCandidate= [[startBlock, endBlock + 25], [[A1, A1 + A1_len]]]
-    for nestedTerm in nestedCandidate[1]:
-        newCandidate[1].append(nestedTerm)
+                         newPair: list, nestedCandidate: list):
+    newCandidate= [[startBlock, endBlock + 25], [newPair[0]]]
+    for nestedWord in nestedCandidate[1]:
+        newCandidate[1].append(nestedWord)
     
-    newCandidate[1].append([A2, A2 + A2_len])
+    newCandidate[1].append(newPair[1])
     candidateList.append(newCandidate)
 
-def search_nested_chiasmi(currentMatch, candidateList):
-    
+def search_nested_chiasmi(currentPair, candidateList):
+    # iterate from the end to get recent matches
     for candidate in reversed(candidateList):
-        if(candidate[1][-1][1] <= currentMatch[0]):
+        if(candidate[1][-1].parent.end_char <= currentPair[0].parent.start_char):
             break
-        elif(candidate[1][0][0] > currentMatch[0] and candidate[1][-1][1] < currentMatch[1]):
+        elif(candidate[1][0].parent.start_char > currentPair[0].parent.end_char
+                and candidate[1][-1].parent.end_char < currentPair[1].parent.start_char):
             return candidate
     return -1
 
-def process_next_word(currentWord, currentId, storageTableLemma, matchTableLemma, lengthTable,
+def process_next_word(currentWord, storageTableLemma, matchTableLemma,
                       storageTableEmbedding, matchTableEmbedding, startBlock, endBlock):
     # --- Search of chiasmi through lemma correspondence
 
-    currentTerm = currentWord.lemma
+    currentId = currentWord.parent.start_char
+    currentLemma = currentWord.lemma
     currentLength = len(currentWord.parent.text)
 
-    if currentTerm in storageTableLemma:
-        # we have a new match ! Let's update the storage table
-        storageTableLemma[currentTerm].append(currentId)
-        lengthTable[currentId] = currentLength
-
+    if currentLemma in storageTableLemma:
+        # we have a new match !
         # compute all pairs for the new match (A in A B ... B A)
-        newPairs = list((termId, currentId) for termId in storageTableLemma[currentTerm] if termId != currentId)
+        newPairs = list((matchingWord, currentWord) for matchingWord in storageTableLemma[currentLemma])
         
-        # compute all possible pairs of old matches (B in A B ... B A)
-        oldMatches = list(itertools.combinations(matchTableLemma[oldTerm], 2) for oldTerm in matchTableLemma)
-        # if oldTerm != currentTerm (to avoid A A A A ?)
+        # Let's update the storage table
+        storageTableLemma[currentLemma].append(currentWord)
+        
+        # compute all possible pairs of all old matches (B in A B ... B A)
+        oldMatches = list(itertools.combinations(matchTableLemma[oldLemma], 2) for oldLemma in matchTableLemma)
+        # if oldLemma != currentLemma (to avoid A A A A ?)
         
         oldMatches = list(list(x) for x in oldMatches)
 
@@ -100,16 +99,15 @@ def process_next_word(currentWord, currentId, storageTableLemma, matchTableLemma
             if(nestedCandidate != -1):
                 append_nested_to_candidates(
                     candidateList, startBlock, endBlock,
-                    newPair[0], newPair[1],
-                    lengthTable[newPair[0]], lengthTable[newPair[1]], nestedCandidate
-                )
+                    newPair, nestedCandidate)
                 continue
             
             # iterate over all old matches
-            for oldMatch in oldMatches:
+            for oldMatchingPairs in oldMatches:
                 # iterate over all pairs from the old match to check if it is inside the new match
-                for oldPair in oldMatch:
-                    if oldPair[0] > newPair[0] and oldPair[1] < newPair[1]:
+                for oldPair in oldMatchingPairs:
+                    if(oldPair[0].parent.start_char > newPair[0].parent.start_char 
+                            and oldPair[1].parent.start_char < newPair[1].parent.start_char):
                         # found a chiasmus candidate                
                         # we need, for each candidate : 
                         #   - the position in the raw text of the first character of the first word of the block
@@ -118,17 +116,13 @@ def process_next_word(currentWord, currentId, storageTableLemma, matchTableLemma
                         #   - the position in the block of the words forming the candidate
                         append_to_candidates(
                             candidateList, startBlock, endBlock,
-                            newPair[0], oldPair[0], oldPair[1], newPair[1],
-                            lengthTable[newPair[0]], lengthTable[oldPair[0]],
-                            lengthTable[oldPair[1]], lengthTable[newPair[1]]
-                        )
+                            newPair[0], oldPair[0], oldPair[1], newPair[1])
 
         # update the match table
-        matchTableLemma[currentTerm] = copy.deepcopy(storageTableLemma[currentTerm])
+        matchTableLemma[currentLemma] = copy.deepcopy(storageTableLemma[currentLemma])
     else:
         # no match, let's update the storage table
-        storageTableLemma[currentTerm] = [currentId]
-        lengthTable[currentId] = currentLength
+        storageTableLemma[currentLemma] = [currentWord]
 
     return  # Skip the embedding part for now
     # --- Search of chiasmi through embedding (semantic) similarity (!!! YET UNTESTED !!!)
@@ -148,11 +142,11 @@ def process_next_word(currentWord, currentId, storageTableLemma, matchTableLemma
                     oldPair1Len = storageTableEmbedding[oldPair1][1]
                     for oldPair2 in matchedWords:
                         oldPair2len = storageTableEmbedding[oldPair2][1]
-                        append_to_candidates(
-                            candidateList, startBlock, endBlock,
-                            oldWordId, oldPair1, oldPair2, currentId,
-                            oldWordLen, oldPair1Len, oldPair2len, currentLen
-                        )
+                        # append_to_candidates(
+                        #     candidateList, startBlock, endBlock,
+                        #     oldWordId, oldPair1, oldPair2, currentId,
+                        #     oldWordLen, oldPair1Len, oldPair2len, currentLen
+                        # )
             # Updating the embedding match table
             if oldWordId in matchTableEmbedding:
                 matchTableEmbedding[oldWordId].append(currentId)
@@ -168,26 +162,30 @@ def process_next_word(currentWord, currentId, storageTableLemma, matchTableLemma
 candidateList = []
 lemmaTable = {}
 lemmaMatchTable = {}
-lengthTable = {}
 embeddingTable = {}
 embeddingMatchTable = {}
 
 # -- Initializing the sliding window over the first 30 characters --
 
 initRange = 30
+sentenceIndex = -1
 if(doc.num_words <= 30):
     initRange = doc.num_words
     
 for _ in range(initRange):
     nextWord = next(wordsFront)
-    nextWord = ignore_punctuation_and_stopwords(wordsFront, nextWord, stopwords)
+        
+    nextWord, sentenceIndex = ignore_punctuation_and_stopwords(wordsFront, nextWord, stopwords, sentenceIndex)
+    print(sentenceIndex)
     
     # if we reached the end of the file
     if nextWord == -1:
         break
-        
-    process_next_word(nextWord, nextWord.parent.start_char, lemmaTable, lemmaMatchTable,
-                      lengthTable, embeddingTable, embeddingMatchTable, 0, nextWord.parent.end_char)
+    
+    nextWord.sentenceIndex = sentenceIndex
+    
+    process_next_word(nextWord, lemmaTable, lemmaMatchTable,
+                      embeddingTable, embeddingMatchTable, 0, nextWord.parent.end_char)
 
 # -- Main part : make the window slide using wordsFront and wordsBack --
 #    (Same algorithm but delete info relevant to wordsBack when moving forward)
@@ -205,27 +203,27 @@ for _ in range(initRange):
 # foreach stops when wordsFront ends
 for nextWord, oldWord in zip(wordsFront, wordsBack):
     # If we are currently processing a "punctuation or stop word", then we ignore it
-    nextWord = ignore_punctuation_and_stopwords(wordsFront, nextWord, stopwords)
+    nextWord, sentenceIndex = ignore_punctuation_and_stopwords(wordsFront, nextWord, stopwords, sentenceIndex)
     # if we reached the end of the file
     if nextWord == -1:
         break
 
-    oldWord = ignore_punctuation_and_stopwords(wordsBack, oldWord, stopwords)
+    nextWord.sentenceIndex = sentenceIndex
+    print(sentenceIndex)
+    
+    oldWord, _ = ignore_punctuation_and_stopwords(wordsBack, oldWord, stopwords, None)
     oldLemma = oldWord.lemma
     startBlock = oldWord.parent.start_char
 
     # Processing the front of the window
-    process_next_word(nextWord, nextWord.parent.start_char, lemmaTable, lemmaMatchTable, lengthTable,
+    process_next_word(nextWord, lemmaTable, lemmaMatchTable,
                       embeddingTable, embeddingMatchTable, startBlock, nextWord.parent.end_char)
     
     # handle the rear of the window
     # Delete the word exiting the sliding window from lemmaTable
     if len(lemmaTable[oldLemma]) <= 1:
-        for id in lemmaTable[oldLemma]:
-            del lengthTable[id]
         del lemmaTable[oldLemma]
     else:
-        del lengthTable[lemmaTable[oldLemma][0]]
         del lemmaTable[oldLemma][0]
     # Updating matchTable if necessary after this deletion
     if oldLemma in lemmaMatchTable:
@@ -235,6 +233,8 @@ for nextWord, oldWord in zip(wordsFront, wordsBack):
         else:
             del lemmaMatchTable[oldLemma][0]
 
+print(sentenceIndex)
+print("--------")
 # print('-------\ncandidate list (', len(candidateList), ' candidates):')
 # for candidateBlock, candidateTerms in candidateList:
 #     print(word_from_positions(candidateBlock, content))
@@ -249,27 +249,59 @@ fileNameCandidates = os.path.join("..", "annotation", os.path.splitext(os.path.b
 # Setting default label to "False" to speed up the annotation process
 candidateJson = {"text" : "", "entities" : [], "cats" : "NotAChiasmus"}
 termLetters = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
+nbSentences = len(doc.sentences)
+print(nbSentences)
+# print(doc.sentences[nbSentences-1])
+print()
 
 with open(fileNameCandidates, 'w') as fileOut:
     
-    for candidateBlock, candidateTerms in candidateList:
+    for candidateBlock, candidateWords in candidateList:
         candidateJson["text"] = word_from_positions(candidateBlock, content)
         candidateJson["entities"] = []
         
-        for letterIndex, termPair in enumerate(candidateTerms):
-            newPair = []
-            for term in termPair:
-                term = term - candidateBlock[0]
-                newPair.append(term)
-            if letterIndex < len(candidateTerms)/2:
-                newPair.append(termLetters[letterIndex] + "-1")
+        startBlock = candidateBlock[0]
+        
+        for letterIndex, word in enumerate(candidateWords):
+            wordSpecs = []
+            wordSpecs.append(word.parent.start_char - startBlock)
+            wordSpecs.append(word.parent.end_char - startBlock)
+            
+            if letterIndex < len(candidateWords)/2:
+                wordSpecs.append(termLetters[letterIndex] + "-1")
             else:
-                newPair.append((termLetters[len(candidateTerms) - letterIndex - 1]) + "-2")
-            candidateJson["entities"].append(newPair)
+                wordSpecs.append((termLetters[len(candidateWords) - letterIndex - 1]) + "-2")
+            candidateJson["entities"].append(wordSpecs)
         
         # adding metadata useful for post-annotation processings
-        candidateJson["startBlock"] = candidateBlock[0]
+        candidateJson["startBlock"] = startBlock
         candidateJson["endBlock"] = candidateBlock[1]
+        
+        # adding metadata for candidates rating
+        candidateJson["dep"] = [word.deprel for word in candidateWords]
+        candidateJson["words"] = []
+        candidateJson["lemmas"] = []
+        
+        print(candidateWords[0].sentenceIndex, candidateWords[-1].sentenceIndex)
+        # if(candidateWords[-1].sentenceIndex == nbSentences - 1):
+        #     candidateSentences = doc.sentences[candidateWords[0].sentenceIndex:]
+        #     print("hey")
+        # else:
+        candidateSentences = doc.sentences[candidateWords[0].sentenceIndex:
+                (candidateWords[-1].sentenceIndex + 1)]
+        
+        appendWord = False
+        for sentence in candidateSentences:
+            for word in sentence.words:
+                candidateJson["lemmas"].append(word.lemma)
+                if(word == candidateWords[0]):
+                    appendWord = True
+                if(appendWord):
+                    candidateJson["words"].append(word.text)
+                if(word == candidateWords[-1]):
+                    appendWord = False
+                    break
+                
 
         fileOut.write(json.dumps(candidateJson))
         fileOut.write("\n")

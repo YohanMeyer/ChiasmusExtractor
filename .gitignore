@@ -1,6 +1,6 @@
 # Outputs
 annotated/
-annotation/
+candidates/
 schneider/candidates
 schneider/fasttext_models
 schneider/gerdracor

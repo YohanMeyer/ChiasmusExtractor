@@ -25,6 +25,7 @@ else:
 
 content = get_file_content(fileName, "inputs")
 if(content == -1):
+    print("File not found.")
     exit(0)
 
 
@@ -176,7 +177,6 @@ for _ in range(initRange):
     nextWord = next(wordsFront)
         
     nextWord, sentenceIndex = ignore_punctuation_and_stopwords(wordsFront, nextWord, stopwords, sentenceIndex)
-    print(sentenceIndex)
     
     # if we reached the end of the file
     if nextWord == -1:
@@ -209,7 +209,6 @@ for nextWord, oldWord in zip(wordsFront, wordsBack):
         break
 
     nextWord.sentenceIndex = sentenceIndex
-    print(sentenceIndex)
     
     oldWord, _ = ignore_punctuation_and_stopwords(wordsBack, oldWord, stopwords, None)
     oldLemma = oldWord.lemma
@@ -233,8 +232,6 @@ for nextWord, oldWord in zip(wordsFront, wordsBack):
         else:
             del lemmaMatchTable[oldLemma][0]
 
-print(sentenceIndex)
-print("--------")
 # print('-------\ncandidate list (', len(candidateList), ' candidates):')
 # for candidateBlock, candidateTerms in candidateList:
 #     print(word_from_positions(candidateBlock, content))
@@ -242,7 +239,7 @@ print("--------")
 #         print(word_from_positions(term, content), end = " ")
 #     print('\n-----')
 
-fileNameCandidates = os.path.join("..", "annotation", os.path.splitext(os.path.basename(fileName))[0] + "-annotator.jsonl")
+fileNameCandidates = os.path.join("..", "candidates", os.path.splitext(os.path.basename(fileName))[0] + "-candidates.jsonl")
 
 # format imposed by the usage of Deccano
 # "entities" will contain the positions of the chiasmi terms and "cats" the annotation label
@@ -250,15 +247,13 @@ fileNameCandidates = os.path.join("..", "annotation", os.path.splitext(os.path.b
 candidateJson = {"text" : "", "entities" : [], "cats" : "NotAChiasmus"}
 termLetters = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
 nbSentences = len(doc.sentences)
-print(nbSentences)
-# print(doc.sentences[nbSentences-1])
-print()
 
 with open(fileNameCandidates, 'w') as fileOut:
     
     for candidateBlock, candidateWords in candidateList:
         candidateJson["text"] = word_from_positions(candidateBlock, content)
         candidateJson["entities"] = []
+        candidateJson["index"] = []
         
         startBlock = candidateBlock[0]
         
@@ -282,27 +277,24 @@ with open(fileNameCandidates, 'w') as fileOut:
         candidateJson["words"] = []
         candidateJson["lemmas"] = []
         
-        print(candidateWords[0].sentenceIndex, candidateWords[-1].sentenceIndex)
-        # if(candidateWords[-1].sentenceIndex == nbSentences - 1):
-        #     candidateSentences = doc.sentences[candidateWords[0].sentenceIndex:]
-        #     print("hey")
-        # else:
         candidateSentences = doc.sentences[candidateWords[0].sentenceIndex:
                 (candidateWords[-1].sentenceIndex + 1)]
         
         appendWord = False
+        lemmaIndex = 0
+        ids = [id[0] + startBlock for id in candidateJson["entities"]]
         for sentence in candidateSentences:
             for word in sentence.words:
                 candidateJson["lemmas"].append(word.lemma)
-                if(word == candidateWords[0]):
-                    appendWord = True
-                if(appendWord):
-                    candidateJson["words"].append(word.text)
+                candidateJson["words"].append(word.text)
+                
+                if(word.parent.start_char in ids):
+                    candidateJson["index"].append(lemmaIndex)
+                lemmaIndex += 1
+                
                 if(word == candidateWords[-1]):
-                    appendWord = False
                     break
                 
-
         fileOut.write(json.dumps(candidateJson))
         fileOut.write("\n")
     

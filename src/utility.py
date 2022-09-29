@@ -34,7 +34,11 @@ glove = GloveEmbedding('common_crawl_48', d_emb=300, show_progress=True)
 
 def glove_emb(word: str) -> FloatTensor:
     try:
-        return FloatTensor(glove.emb(word))
+        emb = glove.emb(word.lower())
+        if emb[0] is not None:
+            return FloatTensor(emb)
+        else:
+            return FloatTensor([0.] * 300)
     except TypeError:
         return FloatTensor([0.] * 300)
 

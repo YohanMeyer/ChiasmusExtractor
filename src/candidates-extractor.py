@@ -82,13 +82,13 @@ def append_nested_to_candidates(startBlock: int, endBlock: int,
 
 
 def search_nested_chiasmi(currentMatch, candidateList):
+    nestedChiasmi = []
     for candidate in reversed(candidateList):
         if(candidate[1][-1][1] <= currentMatch[0]):
             break
         elif(candidate[1][0][0] > currentMatch[0] and candidate[1][-1][1] < currentMatch[1]):
-            return candidate
-    return -1
-
+            nestedChiasmi.append(candidate)
+    return nestedChiasmi
 
 def process_next_word(currentWord, currentId, startBlock, endBlock):
     alreadyDetectedCandidates = []
@@ -116,15 +116,14 @@ def process_next_word(currentWord, currentId, startBlock, endBlock):
         for newPair in newPairs:
 
             # check if the chiasmus contains more than two pairs
-            nestedCandidate = search_nested_chiasmi(newPair, candidateList)
-            if nestedCandidate != -1:
+            nestedCandidates = search_nested_chiasmi(newPair, candidateList)
+            for nested in nestedCandidates:
                 append_nested_to_candidates(
                     startBlock, endBlock,
                     newPair[0], newPair[1],
                     lengthTable[newPair[0]], lengthTable[newPair[1]],
-                    nestedCandidate, alreadyDetectedCandidates
+                    nested, alreadyDetectedCandidates
                 )
-                continue
             
             # iterate over all old matches
             for oldMatch in oldMatches:
@@ -165,8 +164,8 @@ def process_next_word(currentWord, currentId, startBlock, endBlock):
         similarity = emb_similarity(currentEmb, emb)
         if similarity > EMBEDDING_SIMILARITY_LIMIT or similarity < -EMBEDDING_SIMILARITY_LIMIT:
             # We have a match! Searching for possible nested chiasmi first
-            nestedCandidate = search_nested_chiasmi((oldWordId, currentId), candidateList)
-            if nestedCandidate != -1:
+            allNestedCandidates = search_nested_chiasmi((oldWordId, currentId), candidateList)
+            for nestedCandidate in allNestedCandidates:
                 candidateComposedId = tuple([oldWordId] + [nestedTerm[0] for nestedTerm in nestedCandidate[1]] + [currentId])
                 if candidateComposedId not in alreadyDetectedCandidates:
                     append_nested_to_candidates(
@@ -175,6 +174,7 @@ def process_next_word(currentWord, currentId, startBlock, endBlock):
                         oldWordLen, currentLen,
                         nestedCandidate, alreadyDetectedCandidates
                     )
+
             # No nested chiasmi, searching for regular chiasmi now
             for oldPair1, matchedWords in matchTableEmbedding.items():
                 # We need the second pairs to be contained withing the first pair

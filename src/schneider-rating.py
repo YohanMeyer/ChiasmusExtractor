@@ -3,8 +3,10 @@ import json
 from scipy.spatial import distance
 import numpy as np
 from tqdm import tqdm
-import fasttext
+# import fasttext
 import os
+import types
+import pickle
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
@@ -16,14 +18,33 @@ from sklearn.tree import DecisionTreeRegressor
 
 from utility import *
 
+# [-- ADDED CODE: BERTHOMET & MEYER --]
+
+from embeddings import GloveEmbedding
+
+os.environ['HOME'] = os.path.join('..', '..', 'GloVe')
+glove = GloveEmbedding('common_crawl_48', d_emb=300, show_progress=True)
+
+
+def glove_emb_ndarray(word: str) -> np.ndarray:
+    return np.array(glove.emb(word.lower()))
+
+# [--       END OF ADDED CODE       --]
+
 class RatingMachine: 
-    def __init__(self, fasttextModel=None, verbose = False, negList = None, conjList = None, featureTypes = None, C=1, model_type = "logreg", chiasmus_regex_pattern = None, posBlacklist=None, rating_model=None):
+    def __init__(self, gloveModel=None, verbose = False, negList = None, conjList = None, featureTypes = None, C=1, model_type = "logreg", chiasmus_regex_pattern = None, posBlacklist=None, rating_model=None):
        
         # [TODO][embedding] replace with GloVe ?
-        if fasttextModel is not None:
-            self.fasttextModel = fasttext.load_model(fasttextModel)
-        else:
-            self.fasttextModel = None
+        # if fasttextModel is not None:
+        #     self.fasttextModel = fasttext.load_model(fasttextModel)
+        # else:
+        #     self.fasttextModel = None
+        if gloveModel is None:
+            self.gloveModel = lambda w: np.array(glove.emb(w.lower()))
+        elif isinstance(gloveModel, types.FunctionType):
+            self.gloveModel = gloveModel
+        else:  # Neither None nor function? Then we assume it's an array-like object
+            self.gloveModel = lambda w: np.array(gloveModel[w])
 
         self.negList = negList
         self.conjList = conjList
@@ -316,13 +337,13 @@ class RatingMachine:
         return np.concatenate(features, axis=0)
 
     def _preprocess_training_data(self, data):
-        assert(self.fasttextModel is not None)
+        assert(self.gloveModel is not None)
         #print("compute vectors if needed")
         for instance in data:
             if "vectors" in instance:
                 continue
             words = instance["words"]
-            vectors = [self.fasttextModel[word] for word in words]
+            vectors = [self.gloveModel(word) for word in words]
             # [TODO][embedding] adapt with our embedding ?
             instance["vectors"] = vectors
 
@@ -444,7 +465,8 @@ def main():
         
     print('initialize rating machine')
     chiRate = RatingMachine(
-            fasttextModel = '../schneider/fasttext_models/wiki.en.bin',
+            # fasttextModel = '../schneider/fasttext_models/wiki.en.bin',
+            gloveModel = None,
             # featureTypes = ['dubremetz', 'lexical', 'embedding'],
             featureTypes = ['dubremetz', 'lexical'],
             conjList = ["and", "so", "because", "neither", "nor", "but", "for", "yet"],

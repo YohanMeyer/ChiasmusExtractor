@@ -1,4 +1,6 @@
 import os
+
+import numpy
 from embeddings import GloveEmbedding
 import torch
 from torch import FloatTensor
@@ -39,7 +41,7 @@ glove = GloveEmbedding('common_crawl_48', d_emb=300, show_progress=True)
 
 
 def glove_emb(word: str) -> FloatTensor:
-    return FloatTensor(glove.emb(word))
+    return FloatTensor(glove.emb(word.lower()))
 
 
 def emb_similarity(emb1: FloatTensor, emb2: FloatTensor) -> float:

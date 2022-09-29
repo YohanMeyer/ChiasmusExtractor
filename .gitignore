@@ -1,6 +1,10 @@
 # Embedding database
 GloVe/
 
+# Outputs
+annotation/
+outputs/
+
 # MacOS and dev files
 **/**DS_Store
 TODO.txt

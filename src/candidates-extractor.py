@@ -12,7 +12,7 @@ from utility import *
 # doc for stanza : https://stanfordnlp.github.io/stanza/data_objects#document
 # Stopwords downloaded on https://www.ranks.nl/stopwords and manually modified
 
-SIMILARITY_LIMIT = 0.7
+EMBEDDING_SIMILARITY_LIMIT = 0.8
 
 
 # -- Initializing the project --
@@ -21,7 +21,7 @@ if __name__ == '__main__' and len(sys.argv) >= 2:
     fileName = sys.argv[1]
 else:
     fileName = input('Enter the name of the file to process : ')
-    if fileName == "":
+    if fileName == "":  # Quick hack to launch things faster when testing, to delete in the final version
         fileName = "small-chiasmi.txt"
 
 content = get_file_content(fileName, "inputs")
@@ -59,7 +59,7 @@ lengthTable = {}
 
 
 def append_to_candidates(startBlock: int, endBlock: int,
-                         A1: str, B1: str, B2: str, A2: str,
+                         A1: int, B1: int, B2: int, A2: int,
                          A1_len: int, B1_len: int, B2_len: int, A2_len: int):
     candidateList.append([
         [startBlock, endBlock + 25], [[A1, A1 + A1_len],
@@ -67,24 +67,28 @@ def append_to_candidates(startBlock: int, endBlock: int,
                                       [B2, B2 + B2_len],
                                       [A2, A2 + A2_len]]
     ])
-    
-def append_nested_to_candidates(candidateList: list, startBlock: int, endBlock: int,
-                         A1: int, A2: int, A1_len: int, A2_len: int, nestedCandidate: list):
-    newCandidate= [[startBlock, endBlock + 25], [[A1, A1 + A1_len]]]
+
+
+def append_nested_to_candidates(startBlock: int, endBlock: int,
+                                A1: int, A2: int, A1_len: int, A2_len: int,
+                                nestedCandidate: list, alreadyDetectedCandidates: list):
+    newCandidate = [[startBlock, endBlock + 25], [[A1, A1 + A1_len]]]
     for nestedTerm in nestedCandidate[1]:
         newCandidate[1].append(nestedTerm)
     
     newCandidate[1].append([A2, A2 + A2_len])
     candidateList.append(newCandidate)
+    alreadyDetectedCandidates.append(tuple([A1] + [nestedTerm[0] for nestedTerm in nestedCandidate[1]] + [A2]))
+
 
 def search_nested_chiasmi(currentMatch, candidateList):
-    
     for candidate in reversed(candidateList):
         if(candidate[1][-1][1] <= currentMatch[0]):
             break
         elif(candidate[1][0][0] > currentMatch[0] and candidate[1][-1][1] < currentMatch[1]):
             return candidate
     return -1
+
 
 def process_next_word(currentWord, currentId, startBlock, endBlock):
     alreadyDetectedCandidates = []
@@ -113,11 +117,12 @@ def process_next_word(currentWord, currentId, startBlock, endBlock):
 
             # check if the chiasmus contains more than two pairs
             nestedCandidate = search_nested_chiasmi(newPair, candidateList)
-            if(nestedCandidate != -1):
+            if nestedCandidate != -1:
                 append_nested_to_candidates(
-                    candidateList, startBlock, endBlock,
+                    startBlock, endBlock,
                     newPair[0], newPair[1],
-                    lengthTable[newPair[0]], lengthTable[newPair[1]], nestedCandidate
+                    lengthTable[newPair[0]], lengthTable[newPair[1]],
+                    nestedCandidate, alreadyDetectedCandidates
                 )
                 continue
             
@@ -158,16 +163,26 @@ def process_next_word(currentWord, currentId, startBlock, endBlock):
     # Search for possible matches
     for oldWordId, (emb, oldWordLen) in storageTableEmbedding.items():
         similarity = emb_similarity(currentEmb, emb)
-        if similarity > SIMILARITY_LIMIT or similarity < -SIMILARITY_LIMIT:
-            # We have a match! Searching for possible second pairs of matching words
+        if similarity > EMBEDDING_SIMILARITY_LIMIT or similarity < -EMBEDDING_SIMILARITY_LIMIT:
+            # We have a match! Searching for possible nested chiasmi first
+            nestedCandidate = search_nested_chiasmi((oldWordId, currentId), candidateList)
+            if nestedCandidate != -1:
+                candidateComposedId = tuple([oldWordId] + [nestedTerm[0] for nestedTerm in nestedCandidate[1]] + [currentId])
+                if candidateComposedId not in alreadyDetectedCandidates:
+                    append_nested_to_candidates(
+                        startBlock, endBlock,
+                        oldWordId, currentId,
+                        oldWordLen, currentLen,
+                        nestedCandidate, alreadyDetectedCandidates
+                    )
+            # No nested chiasmi, searching for regular chiasmi now
             for oldPair1, matchedWords in matchTableEmbedding.items():
-                # We need the second pairs to be contained withing the first pair,
-                # i.e. its first word to be AFTER the word we originally matched
+                # We need the second pairs to be contained withing the first pair
                 if oldWordId < oldPair1:
                     oldPair1Len = storageTableEmbedding[oldPair1][1]
                     for oldPair2 in matchedWords:
                         oldPair2len = storageTableEmbedding[oldPair2][1]
-                        # Making sure we are only taking into account non-lemma chiasmis:
+                        # Making sure we are only taking into account non-lemma chiasmi:
                         if (oldWordId, oldPair1, oldPair2, currentId) not in alreadyDetectedCandidates:
                             append_to_candidates(
                                 startBlock, endBlock,
@@ -231,13 +246,13 @@ for nextWord, oldWord in zip(wordsFront, wordsBack):
     
     # handle the rear of the window
     # Delete the word exiting the sliding window from lemmaTable
-    if len(lemmaTable[oldLemma]) <= 1:
-        for id in lemmaTable[oldLemma]:
-            del lengthTable[id]
-        del lemmaTable[oldLemma]
+    if len(storageTableLemma[oldLemma]) <= 1:
+        for _id in storageTableLemma[oldLemma]:
+            del lengthTable[_id]
+        del storageTableLemma[oldLemma]
     else:
-        del lengthTable[lemmaTable[oldLemma][0]]
-        del lemmaTable[oldLemma][0]
+        del lengthTable[storageTableLemma[oldLemma][0]]
+        del storageTableLemma[oldLemma][0]
     # Updating matchTable if necessary after this deletion
     if oldLemma in matchTableLemma:
         # delete when only one occurrence is left - not a match anymore

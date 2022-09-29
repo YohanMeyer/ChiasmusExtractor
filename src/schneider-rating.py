@@ -18,18 +18,10 @@ from sklearn.tree import DecisionTreeRegressor
 
 from utility import *
 
-# [-- ADDED CODE: BERTHOMET & MEYER --]
-
 from embeddings import GloveEmbedding
 
-os.environ['HOME'] = os.path.join('..', '..', 'GloVe')
+os.environ['HOME'] = os.path.join('..', 'GloVe')
 glove = GloveEmbedding('common_crawl_48', d_emb=300, show_progress=True)
-
-
-def glove_emb_ndarray(word: str) -> np.ndarray:
-    return np.array(glove.emb(word.lower()))
-
-# [--       END OF ADDED CODE       --]
 
 class RatingMachine: 
     def __init__(self, gloveModel=None, verbose = False, negList = None, conjList = None, featureTypes = None, C=1, model_type = "logreg", chiasmus_regex_pattern = None, posBlacklist=None, rating_model=None):

@@ -12,7 +12,7 @@ from utility import *
 # doc for stanza : https://stanfordnlp.github.io/stanza/data_objects#document
 # Stopwords downloaded on https://www.ranks.nl/stopwords and manually modified
 
-SIMILARITY_LIMIT = 0.7
+EMBEDDING_SIMILARITY_LIMIT = 0.8
 
 
 # -- Initializing the project --
@@ -21,6 +21,8 @@ if __name__ == '__main__' and len(sys.argv) >= 2:
     fileName = sys.argv[1]
 else:
     fileName = input('Enter the name of the file to process : ')
+    if fileName == "":  # Quick hack to launch things faster when testing, to delete in the final version
+        fileName = "small-chiasmi.txt"
 
 content = get_file_content(fileName, "inputs")
 if(content == -1):
@@ -41,9 +43,22 @@ stopwords = set(line.strip() for line in open('stopwords.txt'))
 # We have corresponding lemmas for each word. We need to initialize a window of 30 lemmas and put them in a hash
 # table. Every time we have a match -> verify if we have a match inside
 
+
+# -- Creating the general variables --
+
+
+candidateList = []
+storageTableLemma = {}
+matchTableLemma = {}
+storageTableEmbedding = {}
+matchTableEmbedding = {}
+lengthTable = {}
+
+
 # -- Processing function for each next word --
 
-def append_to_candidates(candidateList: list, startBlock: int, endBlock: int,
+
+def append_to_candidates(startBlock: int, endBlock: int,
                          A1: int, B1: int, B2: int, A2: int,
                          A1_len: int, B1_len: int, B2_len: int, A2_len: int):
     candidateList.append([
@@ -52,18 +67,21 @@ def append_to_candidates(candidateList: list, startBlock: int, endBlock: int,
                                       [B2, B2 + B2_len],
                                       [A2, A2 + A2_len]]
     ])
-    
-def append_nested_to_candidates(candidateList: list, startBlock: int, endBlock: int,
-                         A1: int, A2: int, A1_len: int, A2_len: int, nestedCandidate: list):
-    newCandidate= [[startBlock, endBlock + 25], [[A1, A1 + A1_len]]]
+
+
+def append_nested_to_candidates(startBlock: int, endBlock: int,
+                                A1: int, A2: int, A1_len: int, A2_len: int,
+                                nestedCandidate: list, alreadyDetectedCandidates: list):
+    newCandidate = [[startBlock, endBlock + 25], [[A1, A1 + A1_len]]]
     for nestedTerm in nestedCandidate[1]:
         newCandidate[1].append(nestedTerm)
     
     newCandidate[1].append([A2, A2 + A2_len])
     candidateList.append(newCandidate)
+    alreadyDetectedCandidates.append(tuple([A1] + [nestedTerm[0] for nestedTerm in nestedCandidate[1]] + [A2]))
+
 
 def search_nested_chiasmi(currentMatch, candidateList):
-    
     for candidate in reversed(candidateList):
         if(candidate[1][-1][1] <= currentMatch[0]):
             break
@@ -71,8 +89,10 @@ def search_nested_chiasmi(currentMatch, candidateList):
             return candidate
     return -1
 
-def process_next_word(currentWord, currentId, storageTableLemma, matchTableLemma, lengthTable,
-                      storageTableEmbedding, matchTableEmbedding, startBlock, endBlock):
+
+def process_next_word(currentWord, currentId, startBlock, endBlock):
+    alreadyDetectedCandidates = []
+
     # --- Search of chiasmi through lemma correspondence
 
     currentTerm = currentWord.lemma
@@ -97,11 +117,12 @@ def process_next_word(currentWord, currentId, storageTableLemma, matchTableLemma
 
             # check if the chiasmus contains more than two pairs
             nestedCandidate = search_nested_chiasmi(newPair, candidateList)
-            if(nestedCandidate != -1):
+            if nestedCandidate != -1:
                 append_nested_to_candidates(
-                    candidateList, startBlock, endBlock,
+                    startBlock, endBlock,
                     newPair[0], newPair[1],
-                    lengthTable[newPair[0]], lengthTable[newPair[1]], nestedCandidate
+                    lengthTable[newPair[0]], lengthTable[newPair[1]],
+                    nestedCandidate, alreadyDetectedCandidates
                 )
                 continue
             
@@ -117,11 +138,12 @@ def process_next_word(currentWord, currentId, storageTableLemma, matchTableLemma
                         #       -> currently, we take the subsequent 25 characters
                         #   - the position in the block of the words forming the candidate
                         append_to_candidates(
-                            candidateList, startBlock, endBlock,
+                            startBlock, endBlock,
                             newPair[0], oldPair[0], oldPair[1], newPair[1],
                             lengthTable[newPair[0]], lengthTable[oldPair[0]],
                             lengthTable[oldPair[1]], lengthTable[newPair[1]]
                         )
+                        alreadyDetectedCandidates.append((newPair[0], oldPair[0], oldPair[1], newPair[1]))
 
         # update the match table
         matchTableLemma[currentTerm] = copy.deepcopy(storageTableLemma[currentTerm])
@@ -130,29 +152,43 @@ def process_next_word(currentWord, currentId, storageTableLemma, matchTableLemma
         storageTableLemma[currentTerm] = [currentId]
         lengthTable[currentId] = currentLength
 
-    return  # Skip the embedding part for now
     # --- Search of chiasmi through embedding (semantic) similarity (!!! YET UNTESTED !!!)
 
-    currentEmb = glove_emb(currentWord.text)
-    currentLen = len(currentWord.text)
+    currentText = currentWord.text
+    # print(f"<<WINDOW>>\t{word_from_positions((startBlock, endBlock), content)}")
+    # print(f"<<CURRENT WORD>>\t{currentText}")
+    currentEmb = glove_emb(currentText)
+    currentLen = len(currentText)
 
     # Search for possible matches
     for oldWordId, (emb, oldWordLen) in storageTableEmbedding.items():
         similarity = emb_similarity(currentEmb, emb)
-        if similarity > SIMILARITY_LIMIT or similarity < -SIMILARITY_LIMIT:
-            # We have a match! Searching for possible second pairs of matching words
+        if similarity > EMBEDDING_SIMILARITY_LIMIT or similarity < -EMBEDDING_SIMILARITY_LIMIT:
+            # We have a match! Searching for possible nested chiasmi first
+            nestedCandidate = search_nested_chiasmi((oldWordId, currentId), candidateList)
+            if nestedCandidate != -1:
+                candidateComposedId = tuple([oldWordId] + [nestedTerm[0] for nestedTerm in nestedCandidate[1]] + [currentId])
+                if candidateComposedId not in alreadyDetectedCandidates:
+                    append_nested_to_candidates(
+                        startBlock, endBlock,
+                        oldWordId, currentId,
+                        oldWordLen, currentLen,
+                        nestedCandidate, alreadyDetectedCandidates
+                    )
+            # No nested chiasmi, searching for regular chiasmi now
             for oldPair1, matchedWords in matchTableEmbedding.items():
-                # We need the second pairs to be contained withing the first pair,
-                # i.e. its first word to be AFTER the word we orginally matched
+                # We need the second pairs to be contained withing the first pair
                 if oldWordId < oldPair1:
                     oldPair1Len = storageTableEmbedding[oldPair1][1]
                     for oldPair2 in matchedWords:
                         oldPair2len = storageTableEmbedding[oldPair2][1]
-                        append_to_candidates(
-                            candidateList, startBlock, endBlock,
-                            oldWordId, oldPair1, oldPair2, currentId,
-                            oldWordLen, oldPair1Len, oldPair2len, currentLen
-                        )
+                        # Making sure we are only taking into account non-lemma chiasmi:
+                        if (oldWordId, oldPair1, oldPair2, currentId) not in alreadyDetectedCandidates:
+                            append_to_candidates(
+                                startBlock, endBlock,
+                                oldWordId, oldPair1, oldPair2, currentId,
+                                oldWordLen, oldPair1Len, oldPair2len, currentLen
+                            )
             # Updating the embedding match table
             if oldWordId in matchTableEmbedding:
                 matchTableEmbedding[oldWordId].append(currentId)
@@ -162,15 +198,6 @@ def process_next_word(currentWord, currentId, storageTableLemma, matchTableLemma
     # Updating the embedding storage table
     storageTableEmbedding[currentId] = (currentEmb, currentLen)
 
-
-# -- Creating the general variables --
-
-candidateList = []
-lemmaTable = {}
-lemmaMatchTable = {}
-lengthTable = {}
-embeddingTable = {}
-embeddingMatchTable = {}
 
 # -- Initializing the sliding window over the first 30 characters --
 
@@ -185,9 +212,8 @@ for _ in range(initRange):
     # if we reached the end of the file
     if nextWord == -1:
         break
-        
-    process_next_word(nextWord, nextWord.parent.start_char, lemmaTable, lemmaMatchTable,
-                      lengthTable, embeddingTable, embeddingMatchTable, 0, nextWord.parent.end_char)
+
+    process_next_word(nextWord, nextWord.parent.start_char,  0, nextWord.parent.end_char)
 
 # -- Main part : make the window slide using wordsFront and wordsBack --
 #    (Same algorithm but delete info relevant to wordsBack when moving forward)
@@ -212,28 +238,35 @@ for nextWord, oldWord in zip(wordsFront, wordsBack):
 
     oldWord = ignore_punctuation_and_stopwords(wordsBack, oldWord, stopwords)
     oldLemma = oldWord.lemma
+    oldId = oldWord.parent.start_char
     startBlock = oldWord.parent.start_char
 
     # Processing the front of the window
-    process_next_word(nextWord, nextWord.parent.start_char, lemmaTable, lemmaMatchTable, lengthTable,
-                      embeddingTable, embeddingMatchTable, startBlock, nextWord.parent.end_char)
+    process_next_word(nextWord, nextWord.parent.start_char, startBlock, nextWord.parent.end_char)
     
     # handle the rear of the window
     # Delete the word exiting the sliding window from lemmaTable
-    if len(lemmaTable[oldLemma]) <= 1:
-        for id in lemmaTable[oldLemma]:
-            del lengthTable[id]
-        del lemmaTable[oldLemma]
+    if len(storageTableLemma[oldLemma]) <= 1:
+        for _id in storageTableLemma[oldLemma]:
+            del lengthTable[_id]
+        del storageTableLemma[oldLemma]
     else:
-        del lengthTable[lemmaTable[oldLemma][0]]
-        del lemmaTable[oldLemma][0]
+        del lengthTable[storageTableLemma[oldLemma][0]]
+        del storageTableLemma[oldLemma][0]
     # Updating matchTable if necessary after this deletion
-    if oldLemma in lemmaMatchTable:
+    if oldLemma in matchTableLemma:
         # delete when only one occurrence is left - not a match anymore
-        if len(lemmaMatchTable[oldLemma]) <= 2:
-            del lemmaMatchTable[oldLemma]
+        if len(matchTableLemma[oldLemma]) <= 2:
+            del matchTableLemma[oldLemma]
         else:
-            del lemmaMatchTable[oldLemma][0]
+            del matchTableLemma[oldLemma][0]
+
+    # Deleting the word exiting the sliding window from the embedding tables
+    del storageTableEmbedding[oldId]
+    if oldId in matchTableEmbedding:
+        for _ in range(len(matchTableEmbedding[oldId])):
+            del matchTableEmbedding[oldId][0]
+        del matchTableEmbedding[oldId]
 
 # print('-------\ncandidate list (', len(candidateList), ' candidates):')
 # for candidateBlock, candidateTerms in candidateList:

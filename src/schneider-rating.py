@@ -84,7 +84,8 @@ class RatingMachine:
         
         with open(os.path.join("..", candidatesFolder, outputFile), 'w') as fileOut:
             for i in range(numCandidates):
-                json.dump(candidates[sorting[i]], fileOut, ensure_ascii=False, indent=4)
+                fileOut.write(json.dumps(candidates[sorting[i]]))
+                fileOut.write("\n")
 
     def get_dubremetz_features(self, candidate):
         ids = candidate["index"]

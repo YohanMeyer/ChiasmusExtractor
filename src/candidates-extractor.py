@@ -13,6 +13,7 @@ from utility import *
 # Stopwords downloaded on https://www.ranks.nl/stopwords and manually modified
 
 EMBEDDING_SIMILARITY_LIMIT = 0.8
+WINDOW_SIZE = 30
 
 # -- Creating the general variables --
 
@@ -205,70 +206,60 @@ def main():
     stopwords = set(line.strip() for line in open('stopwords.txt'))
     
     # -- Initializing the sliding window over the first 30 characters --
-
-    initRange = 30
-    if(doc.num_words <= 30):
-        initRange = doc.num_words
-        
-    for _ in range(initRange):
-        nextWord = next(wordsFront)
-        nextWord = ignore_punctuation_and_stopwords(wordsFront, nextWord, stopwords)
-        
-        # if we reached the end of the file
-        if nextWord == -1:
+    
+    for _ in range(WINDOW_SIZE - 1):
+        try:
+            nextWord = next(wordsFront)
+        except StopIteration:
+            # if we reached the end of the file
             break
-
-        process_next_word(nextWord, nextWord.parent.start_char,  0, nextWord.parent.end_char)
-
+        
+        if(not is_punctuation_or_stopword(nextWord, stopwords)):
+            # only process if it is a valid word
+            process_next_word(
+                    nextWord, nextWord.parent.start_char, 0, nextWord.parent.end_char)
+    
     # -- Main part : make the window slide using wordsFront and wordsBack --
-
+    
     # foreach stops when wordsFront ends
     for nextWord, oldWord in zip(wordsFront, wordsBack):
-        # If we are currently processing a "punctuation or stop word", then we ignore it
-        nextWord = ignore_punctuation_and_stopwords(wordsFront, nextWord, stopwords)
-        # if we reached the end of the file
-        if nextWord == -1:
-            break
-
-        oldWord = ignore_punctuation_and_stopwords(wordsBack, oldWord, stopwords)
-        oldLemma = oldWord.lemma
-        oldId = oldWord.parent.start_char
         startBlock = oldWord.parent.start_char
 
-        # Processing the front of the window
-        process_next_word(nextWord, nextWord.parent.start_char, startBlock, nextWord.parent.end_char)
+        # Processing the front of the window, only process if it is a valid word
+        if(not is_punctuation_or_stopword(nextWord, stopwords)):
+            process_next_word(
+                nextWord, nextWord.parent.start_char, startBlock, nextWord.parent.end_char)
         
-        # handle the rear of the window
-        # Delete the word exiting the sliding window from lemmaTable
-        if len(storageTableLemma[oldLemma]) <= 1:
-            for _id in storageTableLemma[oldLemma]:
-                del lengthTable[_id]
-            del storageTableLemma[oldLemma]
-        else:
-            del lengthTable[storageTableLemma[oldLemma][0]]
-            del storageTableLemma[oldLemma][0]
-        # Updating matchTable if necessary after this deletion
-        if oldLemma in matchTableLemma:
-            # delete when only one occurrence is left - not a match anymore
-            if len(matchTableLemma[oldLemma]) <= 2:
-                del matchTableLemma[oldLemma]
+        # handle the rear of the window, only delete if it is a valid word
+        if(not is_punctuation_or_stopword(oldWord, stopwords)):
+            oldLemma = oldWord.lemma
+            oldId = oldWord.parent.start_char
+            
+            # Delete the word exiting the sliding window from lemmaTable
+            if len(storageTableLemma[oldLemma]) <= 1:
+                for _id in storageTableLemma[oldLemma]:
+                    del lengthTable[_id]
+                del storageTableLemma[oldLemma]
             else:
-                del matchTableLemma[oldLemma][0]
+                del lengthTable[storageTableLemma[oldLemma][0]]
+                del storageTableLemma[oldLemma][0]
+            
+            # Updating matchTable if necessary after this deletion
+            if oldLemma in matchTableLemma:
+                # delete when only one occurrence is left - not a match anymore
+                if len(matchTableLemma[oldLemma]) <= 2:
+                    del matchTableLemma[oldLemma]
+                else:
+                    del matchTableLemma[oldLemma][0]
 
-        # Deleting the word exiting the sliding window from the embedding tables
-        del storageTableEmbedding[oldId]
-        if oldId in matchTableEmbedding:
-            for _ in range(len(matchTableEmbedding[oldId])):
-                del matchTableEmbedding[oldId][0]
-            del matchTableEmbedding[oldId]
-
-    # print('-------\ncandidate list (', len(candidateList), ' candidates):')
-    # for candidateBlock, candidateTerms in candidateList:
-    #     print(word_from_positions(candidateBlock, content))
-    #     for term in candidateTerms:
-    #         print(word_from_positions(term, content), end = " ")
-    #     print('\n-----')
-
+            # Deleting the word exiting the sliding window from the embedding tables
+            del storageTableEmbedding[oldId]
+            if oldId in matchTableEmbedding:
+                for _ in range(len(matchTableEmbedding[oldId])):
+                    del matchTableEmbedding[oldId][0]
+                del matchTableEmbedding[oldId]
+    
+    # we now have our full list of candidates, need to write it into a file
     fileNameCandidates = os.path.join("..", "annotation", os.path.splitext(os.path.basename(fileName))[0] + "-annotator.jsonl")
 
     # format imposed by the usage of Deccano

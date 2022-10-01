@@ -15,15 +15,9 @@ def word_from_positions(positions, fileContent):
     return fileContent[positions[0]:positions[1]]
 
 
-def ignore_punctuation_and_stopwords(wordIterator, nextWord, stopwords):
-    while (nextWord.upos == 'PUNCT' or nextWord.upos == 'SYM' or nextWord.upos == 'X'
-           or nextWord.text.lower() in stopwords):
-        try:
-            nextWord = next(wordIterator)
-        except StopIteration:
-            return -1
-
-    return nextWord
+def is_punctuation_or_stopword(word, stopwords):
+    return (word.upos == 'PUNCT' or word.upos == 'SYM' or word.upos == 'X'
+           or word.text.lower() in stopwords)
     
 # -- Embedding utilities --
 

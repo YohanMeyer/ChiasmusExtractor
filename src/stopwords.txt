@@ -79,6 +79,7 @@ myself
 no
 nor
 not
+n't
 of
 off
 on

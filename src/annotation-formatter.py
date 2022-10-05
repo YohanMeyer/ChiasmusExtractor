@@ -8,9 +8,29 @@ from operator import itemgetter
 from utility import *
 
 ANNOTATED_TRUE = "TrueChiasmus"
+ANNOTATED_FALSE = "NotAChiasmus"
+ANNOTATED_FOLDER = "annotated"
+CANDIDATES_FOLDER = "candidates"
+INPUTS_FOLDER = "inputs"
+ANNOTATED_FILE_SUFFIX = "-annotated.jsonl"
+TOP_FILE_SUFFIX = "-top-results-annotated.jsonl"
 
 # -- Initializing the project, getting file contents --
 
+from tempfile import mkstemp
+from shutil import move, copymode
+from os import fdopen, remove
+
+def replaceAnnotations(oldFilePath, newFilePath, annotatedCandidates):
+    annotation = {annotated["id"]:annotated["cats"] for annotated in annotatedCandidates}
+
+    with open(newFilePath, 'w') as newFile:
+        with jsonlines.open(oldFilePath) as oldFile:
+            for candidate in oldFile:
+                if(candidate["id"] in annotation):
+                    candidate["cats"] = annotation[candidate["id"]]
+                newFile.write(json.dumps(candidate) + "\n")
+    
 def main():
     topResultsMerge = False
     candidatesFileName = ""
@@ -21,27 +41,26 @@ def main():
     else:
         if len(sys.argv) == 2:
             fileName = sys.argv[1]
-            annotatedFileName = fileName + '-annotated.jsonl'
-            rawFileName = fileName + '.txt'
+            annotatedFileName = fileName + ANNOTATED_FILE_SUFFIX
+            rawFileName = fileName + ".txt"
         else:
             rawFileName = input('Enter the name of the original raw file : ')
             annotatedFileName = input('Enter the name of the annotated file : ')
             candidatesFileName = input('If the annotated file is a subset of another non-annotated file, enter the name of the bigger file (nothing otherwise): ')
             if(candidatesFileName != ""):
+                mergedFileName = input('Enter the name of the new merged file : ')
                 topResultsMerge = True
     
-    if (candidatesFileName == "" and annotatedFileName[-28:] == "-top-results-annotated.jsonl"):
+    if (candidatesFileName == "" and annotatedFileName[-28:] == TOP_FILE_SUFFIX):
         candidatesFileName = input('Your annotated file was detected as a subset of another non-annotated file. Enter the full name of the bigger file (nothing otherwise): ')
         if(candidatesFileName != ""):
+            mergedFileName = input('Enter the name of the new merged file : ')
             topResultsMerge = True
     
-    annotatedJson = []
-    with jsonlines.open(os.path.join("..", "annotated", annotatedFileName)) as reader:
-        for lineDict in reader:
-            annotatedJson.append(lineDict)
+    annotatedJson = get_file_jsonlines(annotatedFileName, ANNOTATED_FOLDER)
 
-    rawContent = get_file_content(rawFileName, "inputs")
-    if(rawContent == -1):
+    rawContent = get_file_content(rawFileName, INPUTS_FOLDER)
+    if(annotatedJson == -1 or rawContent == -1):
         exit(0)
 
     figureName = input("Please enter the name of the annotated rhetoric figure (chiasmus by default): ").lower() or "chiasmus"
@@ -49,14 +68,17 @@ def main():
     # -- Tidying up the annotated file --
 
     annotatedTrueJson = [dict for dict in annotatedJson if len(dict["cats"]) == 1 and dict["cats"][0] == ANNOTATED_TRUE]
-    annotatedTrueJson = sorted(annotatedTrueJson, key=lambda d: (d["startBlock"] + d['entities'][0][0], d['entities'][1][0]))
+    annotatedTrueJson = sorted(annotatedTrueJson, key=lambda d: (d["startBlock"] + d['entities'][0][0], d['entities'][-1][0]))
     
     
     if topResultsMerge:
-        pass
-        # TODO : load non-annotated candidates file and update annotations
+        replaceAnnotations(
+            os.path.join("..", CANDIDATES_FOLDER, candidatesFileName),
+            os.path.join("..", ANNOTATED_FOLDER, mergedFileName),
+            annotatedTrueJson
+        )
 
-    annotatedXMLFileName = os.path.join("..", "annotated", os.path.splitext(os.path.basename(annotatedFileName))[0] + ".xml")
+    annotatedXMLFileName = os.path.join("..", ANNOTATED_FOLDER, os.path.splitext(os.path.basename(annotatedFileName))[0] + ".xml")
 
     # initializing variables to loop over the document's figures
     textIndex = 0

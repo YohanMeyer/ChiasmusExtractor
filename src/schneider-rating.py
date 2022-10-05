@@ -88,7 +88,7 @@ class RatingMachine:
                 fileOut.write("\n")
 
     def get_dubremetz_features(self, candidate):
-        ids = candidate["index"]
+        ids = candidate["lemmaIndex"]
         ia1 = ids[0]
         ia2 = ids[-1]
         ib1 = ids[int(len(ids)/2 - 1)]
@@ -291,7 +291,7 @@ class RatingMachine:
 
     def get_lexical_features(self, candidate):
         # use only four words of the chiasmus to match all data instances for training
-        ids = candidate["index"]
+        ids = candidate["lemmaIndex"]
         wordsIds = [ids[0], ids[int(len(ids)/2 - 1)], ids[int(len(ids)/2)], ids[-1]]
     
         lemmas = candidate["lemmas"]

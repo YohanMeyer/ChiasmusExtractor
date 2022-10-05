@@ -250,18 +250,20 @@ def main():
     # we now have our full list of candidates, need to write it into a file
     fileNameCandidates = os.path.join("..", "candidates", os.path.splitext(os.path.basename(fileName))[0] + "-candidates.jsonl")
 
-    # format imposed by the usage of Deccano
-    # "entities" will contain the positions of the chiasmi terms and "cats" the annotation label
-    # Setting default label to "False" to speed up the annotation process
-    candidateJson = {"text" : "", "entities" : [], "cats" : "NotAChiasmus"}
+    candidateJson = {}
     termLetters = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
     
     with open(fileNameCandidates, 'w') as fileOut:
         
-        for candidateBlock, candidateWords in candidateList:
+        for id, (candidateBlock, candidateWords) in enumerate(candidateList):
+            candidateJson["id"] = id
+            # format imposed by the usage of Deccano
+            # "entities" will contain the positions of the chiasmi terms and "cats" the annotation label
+            # Setting default label to "False" to speed up the annotation process
             candidateJson["text"] = word_from_positions(candidateBlock, content)
             candidateJson["entities"] = []
-            candidateJson["index"] = []
+            candidateJson["cats"] = ["NotAChiasmus"]
+            candidateJson["lemmaIndex"] = []
             
             startBlock = candidateBlock[0]
             
@@ -297,7 +299,7 @@ def main():
                     candidateJson["words"].append(word.text)
                     
                     if(word.parent.start_char in ids):
-                        candidateJson["index"].append(lemmaIndex)
+                        candidateJson["lemmaIndex"].append(lemmaIndex)
                     lemmaIndex += 1
                     
                     if(word == candidateWords[-1]):

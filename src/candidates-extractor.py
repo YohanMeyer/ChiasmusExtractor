@@ -7,6 +7,8 @@ import stanza
 from stanza.pipeline.core import DownloadMethod
 from nltk.tokenize import wordpunct_tokenize
 
+from tqdm import tqdm
+
 from utility import *
 
 # doc for stanza : https://stanfordnlp.github.io/stanza/data_objects#document
@@ -183,6 +185,8 @@ def main():
             'en', processors='tokenize, lemma, pos, depparse', 
             download_method=DownloadMethod.REUSE_RESOURCES
     )
+    
+    print("----------\n")
 
     doc = processingPipeline(content)
     wordsFront = doc.iter_words()
@@ -192,8 +196,9 @@ def main():
     
     # -- Initializing the sliding window over the first 30 characters --
     
+    print("Initializing the sliding window...")
     sentenceIndex = -1
-    for _ in range(WINDOW_SIZE - 1):
+    for _ in tqdm(range(WINDOW_SIZE - 1)):
         try:
             nextWord = next(wordsFront)
             if(nextWord.id == 1):
@@ -209,8 +214,9 @@ def main():
         
     # -- Main part : make the window slide using wordsFront and wordsBack --
     
+    print("Parsing the document...")
     # foreach stops when wordsFront ends
-    for nextWord, oldWord in zip(wordsFront, wordsBack):
+    for nextWord, oldWord in tqdm(zip(wordsFront, wordsBack), total = (doc.num_words - WINDOW_SIZE + 1)):
         startBlock = oldWord.parent.start_char
         
         if(nextWord.id == 1):
@@ -254,8 +260,9 @@ def main():
     termLetters = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
     
     with open(fileNameCandidates, 'w') as fileOut:
-        
-        for id, (candidateBlock, candidateWords) in enumerate(candidateList):
+        print("Saving candidates in", fileNameCandidates)
+
+        for id, (candidateBlock, candidateWords) in tqdm(enumerate(candidateList), total = len(candidateList)):
             candidateJson["id"] = id
             # format imposed by the usage of Deccano
             # "entities" will contain the positions of the chiasmi terms and "cats" the annotation label
@@ -310,7 +317,6 @@ def main():
         
         fileOut.close()
 
-    print("\n---------")
     print("Candidates stored in", fileNameCandidates)
     
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
-# ChiasmusData
+# ChiasmusExtractor
 
-The repository containing all work concerning data retrieval and annotation for our masterthesis.
+The repository containing all work concerning data retrieval and annotation for our Master's Theses.
 
 ## Global specifications for the annotation tool
 
@@ -56,6 +56,16 @@ To transform the output from Doccano to a more universal scheme inspired from Ha
 python3 annotation-formatter.py [annotated-input.jsonl input.txt]
 ```
 
+## Citing our Master's Theses
+
+Guillaume Berthomet:
+
+@mastersthesis{berthomet2023_antimetabole,
+  author={Guillaume Berthomet},
+  title={Detecting Salient Antimetaboles in English Texts using Deep and Transfer Learning},
+  school={University of Passau \& INSA Lyon},
+  year={2023}
+}
 
 
 
